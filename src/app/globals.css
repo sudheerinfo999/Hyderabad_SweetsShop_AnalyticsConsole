@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Brand-tuned palette — light mode = cream / maroon / gold accents */
+    --background: 40 50% 96%;            /* warm cream */
+    --foreground: 0 35% 18%;             /* deep maroon ink */
+
+    --card: 40 60% 99%;
+    --card-foreground: 0 35% 18%;
+
+    --popover: 40 60% 99%;
+    --popover-foreground: 0 35% 18%;
+
+    --primary: 0 60% 30%;                /* maroon */
+    --primary-foreground: 40 60% 97%;
+
+    --secondary: 39 56% 56%;             /* gold */
+    --secondary-foreground: 0 50% 18%;
+
+    --muted: 38 35% 90%;
+    --muted-foreground: 0 12% 36%;
+
+    --accent: 39 70% 88%;
+    --accent-foreground: 0 50% 18%;
+
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 36 25% 84%;
+    --input: 36 25% 84%;
+    --ring: 0 60% 30%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 0 25% 8%;
+    --foreground: 38 45% 92%;
+
+    --card: 0 25% 11%;
+    --card-foreground: 38 45% 92%;
+
+    --popover: 0 25% 11%;
+    --popover-foreground: 38 45% 92%;
+
+    --primary: 39 70% 60%;               /* gold takes the lead in dark mode */
+    --primary-foreground: 0 35% 12%;
+
+    --secondary: 0 50% 30%;              /* maroon as secondary */
+    --secondary-foreground: 38 45% 92%;
+
+    --muted: 0 15% 16%;
+    --muted-foreground: 38 20% 70%;
+
+    --accent: 0 35% 22%;
+    --accent-foreground: 38 45% 92%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 15% 20%;
+    --input: 0 15% 20%;
+    --ring: 39 70% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  h1, h2, h3, h4, h5 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 999px;
+  }
+
+  .brand-gradient {
+    background: linear-gradient(135deg, #7B1E1E 0%, #9B2A2A 55%, #D4A24C 100%);
+  }
+
+  .glass-card {
+    background: linear-gradient(180deg, hsl(var(--card) / 0.95) 0%, hsl(var(--card) / 0.85) 100%);
+    backdrop-filter: blur(8px);
+  }
+}
+
+/* Leaflet — control colour so it doesn't clash with the brand theme */
+.leaflet-container {
+  font-family: inherit;
+  background: hsl(var(--muted));
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+}

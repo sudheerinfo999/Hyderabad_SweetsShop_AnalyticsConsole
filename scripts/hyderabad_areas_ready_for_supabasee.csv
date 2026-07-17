@@ -1,0 +1,125 @@
+id,area_name,zone_name,latitude,longitude,is_active
+6b14d50d-9c0d-4e8b-8823-3f2ca87d8a15,Raidurg Metro Station,West Hyderabad,17.441200,78.377500,true
+a4d4cbd5-9849-4f15-bc8e-f6f69edae1d8,Near Raidurg Metro,West Hyderabad,17.442000,78.379000,true
+e3ebeaa1-a369-47bf-8966-f6f769fd83fa,Mindspace,West Hyderabad,17.440500,78.381500,true
+8f8887ee-998f-4184-ace9-bad0f9731ca3,Raidurgam,West Hyderabad,17.439500,78.375000,true
+1c6b78c9-5593-4774-8f11-6716fdf542da,Knowledge City,West Hyderabad,17.432000,78.376500,true
+f92c8daf-fe08-4dd5-aa42-8c34a51f7f1f,Cyber Gateway,West Hyderabad,17.447800,78.376800,true
+0c10bdb2-66e2-414c-92ce-32954595781d,Cyber Towers,West Hyderabad,17.450500,78.381000,true
+8ab114aa-1d4c-400e-beb2-4a67a7cc8623,Durgam Cheruvu Metro Station,West Hyderabad,17.430500,78.387500,true
+44c3323e-b999-464a-a5ee-7be9f2615a5e,Kavuri Hills,West Hyderabad,17.441500,78.395000,true
+a215be6c-2567-434f-8311-4495c564e8f6,Ayappa Society,West Hyderabad,17.449000,78.387800,true
+689696e8-8e01-49bc-9a1c-1af189719241,Film Nagar,Central Hyderabad,17.412500,78.415000,true
+a9f8c32a-5316-4061-9357-998b6e97f3ad,Jubilee Hills Check Post Metro Station,Central Hyderabad,17.423500,78.410500,true
+a8866136-eb7d-424d-82bf-5a40cda8d5fe,Road No 36 Jubilee Hills,Central Hyderabad,17.431000,78.407500,true
+611b4e48-28b0-4183-8d8b-e7fa5babe694,Road No 45 Jubilee Hills,Central Hyderabad,17.428500,78.412000,true
+309c492b-1607-4060-9130-59b64fe755ec,Madhura Nagar Metro Station,Central Hyderabad,17.437800,78.442500,true
+9b81212e-c7f0-49e7-8d12-7c45fe859f3d,Yousufguda,Central Hyderabad,17.438500,78.428000,true
+2b8b92e0-222d-4f1f-bdcd-ca48b3286ab5,Krishna Nagar,Central Hyderabad,17.441000,78.435000,true
+e7c51b44-34f4-4e1d-be43-bbdf6e23b2b9,ESI Metro Station,Central Hyderabad,17.442500,78.448500,true
+35317963-3ed9-4079-a504-91a85626c8bb,Balkampet,Central Hyderabad,17.445500,78.451000,true
+45902a73-350a-46f6-8a33-c4eee92770b3,Erramanzil Metro Station,Central Hyderabad,17.425500,78.451500,true
+873dfcd9-fd05-40bf-a806-290715d7898b,Greenlands,Central Hyderabad,17.434500,78.461000,true
+2661f1d2-1633-4220-94f8-1b17badd4fe2,Khairatabad Metro Station,Central Hyderabad,17.412500,78.461500,true
+4dc98766-bf08-4205-9387-9035a8907b87,Assembly Metro Station,Central Hyderabad,17.399500,78.468500,true
+aff11e19-6972-4ad2-baeb-8cbafb689446,Nampally Metro Station,Central Hyderabad,17.391600,78.467600,true
+12717815-3847-4c65-8268-2b870d019011,Abids,Central Hyderabad,17.391700,78.476600,true
+b86c8eb8-676c-4412-827c-52f6a11820b4,Koti,Central Hyderabad,17.384800,78.483000,true
+7061da77-466f-4dfe-becb-eee8a3bea4f7,MG Bus Station Metro Station,Old City,17.378500,78.482500,true
+2320f9de-57d0-4ed9-83d3-1b9f33e39f42,Afzal Gunj,Old City,17.375500,78.478000,true
+6ed20a5d-179d-4302-9fde-0902d2f2b0b2,Malakpet Metro Station,East Hyderabad,17.373500,78.498500,true
+e001ab6a-a1ea-4154-b19f-c1db954f8506,Musarambagh Metro Station,East Hyderabad,17.371000,78.510500,true
+0d89498c-476f-4e63-a5bc-7db616b295cb,Dilsukhnagar Metro Station,East Hyderabad,17.368700,78.524700,true
+a420fe62-8ef8-4ef2-a43c-b967025bd884,Chaitanyapuri Metro Station,East Hyderabad,17.362500,78.535500,true
+064c087d-6cc7-4bd8-9980-73462703d72e,Victoria Memorial Metro Station,East Hyderabad,17.355500,78.542500,true
+20aabc3a-f69b-4fb2-9f3a-ad1f27880862,LB Nagar Metro Station,East Hyderabad,17.349500,78.549000,true
+2066b965-560a-410d-8b72-58642854cfd1,Nagole Metro Station,East Hyderabad,17.375500,78.558500,true
+a89256ca-25b9-4d0a-86a9-cfcfc8d5a021,Stadium Metro Station,East Hyderabad,17.399500,78.550500,true
+f0648e8c-af3b-470a-9040-c3e2f1cf8309,Habsiguda Metro Station,East Hyderabad,17.410500,78.545500,true
+ea2e86a0-6a94-488a-8ea2-caf5431dd7d7,NGRI Metro Station,East Hyderabad,17.416500,78.540500,true
+67c07d65-6847-4be0-ba93-30711c641128,Tarnaka Metro Station,Secunderabad,17.426200,78.533700,true
+5dd4197a-f3b3-49f3-b3b9-7f3615ce6601,Mettuguda Metro Station,Secunderabad,17.437500,78.521500,true
+b533d501-3e38-43a2-a679-aebeb52a749b,Secunderabad East Metro Station,Secunderabad,17.439500,78.510500,true
+27d04796-402f-4f6d-9d89-507b45c74719,Parade Grounds Metro Station,Secunderabad,17.442500,78.498500,true
+786dcaf3-fad9-47df-ab64-440e2d930b8d,Paradise,Secunderabad,17.443500,78.487500,true
+8cb9e4b9-cf36-49b2-93f6-804c341cb422,Rasoolpura Metro Station,Central Hyderabad,17.448500,78.475500,true
+f6f9b857-203a-4677-a69f-769c381b26c0,Prakash Nagar Metro Station,Central Hyderabad,17.445500,78.462500,true
+9cca4ad3-030a-4254-9bd6-c1cb0d2ceed3,Begumpet Metro Station,Central Hyderabad,17.443500,78.469100,true
+4665e2c9-9a50-4647-84f9-104f6a86c4f8,Ameerpet Metro Station,Central Hyderabad,17.437400,78.448200,true
+41456dfa-e622-46ff-a07c-36c25c51036a,Punjagutta Metro Station,Central Hyderabad,17.425600,78.450300,true
+a31db6af-c4f4-4cc2-8ac9-cb1ac3f53630,SR Nagar Metro Station,Central Hyderabad,17.443500,78.442500,true
+e598278d-e717-431c-8c1c-b87747cfc0c0,Erragadda Metro Station,West Hyderabad,17.455500,78.435500,true
+82115755-6170-41f5-866a-005423782af2,Bharat Nagar Metro Station,West Hyderabad,17.465500,78.428500,true
+865b33fe-cd21-4a8a-b677-1d567d4466d0,Moosapet Metro Station,West Hyderabad,17.472500,78.420500,true
+e3bfe29f-1858-401a-91a3-3e173980a33b,Balanagar Metro Station,West Hyderabad,17.478500,78.415500,true
+f61d98b2-cbe8-4dae-a175-38da18454c6d,KPHB Metro Station,West Hyderabad,17.489500,78.398500,true
+d5855613-0c11-4358-a3fd-b5ca456fc591,JNTU College Metro Station,West Hyderabad,17.495500,78.391500,true
+022d7957-4fba-4026-8ce9-eb8e07ce1c14,JNTU Circle,West Hyderabad,17.494800,78.391500,true
+d976cc98-a701-4231-bf76-208b22b36bcd,JNTU Junction,West Hyderabad,17.493500,78.390500,true
+26860cc1-61de-4314-90e0-e18770f68252,Miyapur Metro Station,West Hyderabad,17.496900,78.358200,true
+2021b68b-3892-423b-b4bf-b8ff9e82cb45,Madinaguda,West Hyderabad,17.491500,78.340500,true
+5a9967df-e1d0-4049-a7f3-3ad12a78186b,Allwyn Colony,West Hyderabad,17.492800,78.365000,true
+e6160e44-c3b8-4706-991d-bd6c7b42dc39,Hafeezpet,West Hyderabad,17.482300,78.381900,true
+23d2bd1a-e89c-48d8-a387-a27511fe8471,Hydernagar,West Hyderabad,17.495500,78.405500,true
+13de3e3a-8593-4f03-b338-73ae7b5fda28,Nizampet,West Hyderabad,17.510500,78.390500,true
+8da97061-66bb-4f17-a92a-f55f42862567,Botanical Garden,West Hyderabad,17.460900,78.359300,true
+c388cfcf-52a9-490b-a5cd-6caeb71ac837,Masjid Banda,West Hyderabad,17.455500,78.355500,true
+f2836efd-ef01-45b3-a76f-6292d01ab665,Kothaguda Junction,West Hyderabad,17.458500,78.365500,true
+9b3af412-9d64-4586-9003-9c9a1cc73347,ISB Road,West Hyderabad,17.435500,78.350500,true
+086404b0-f56c-4d19-884c-80cec60ef668,Wipro Circle,West Hyderabad,17.428500,78.348500,true
+0dd288a9-d5c2-4b1f-8107-4a07aa912f99,Nanakramguda,West Hyderabad,17.422100,78.346400,true
+8f601758-72b5-4da8-81d9-4bdd4c76259f,Amazon Hyderabad,West Hyderabad,17.420500,78.342500,true
+e3c32ca1-4868-4976-8e4f-77fe025d0102,Microsoft Campus,West Hyderabad,17.429500,78.341500,true
+756f0fe4-c18b-4e6f-8b0b-50819e715dbb,Golden Mile,West Hyderabad,17.418500,78.345500,true
+90a97ccd-80fc-4f54-ba1f-54ec97bcf979,Beeramguda,West Hyderabad,17.495300,78.293900,true
+624ab011-e2ae-4a6e-999f-2cb5b4db0bbd,Ameenpur,West Hyderabad,17.518500,78.285500,true
+71e43025-0d1e-4688-a774-6d9cd1e2960e,RC Puram,West Hyderabad,17.505500,78.275500,true
+c2d0b530-c25d-437d-b35c-da8a4a303088,Lingampally Railway Station,West Hyderabad,17.485800,78.317500,true
+c0165370-0f0d-4c85-bd2f-9638d9b68aaa,Kollur,West Hyderabad,17.455500,78.255500,true
+5da8ee4f-c7a2-4f80-aa6f-1a8a466d3e7f,Appa Junction,South Hyderabad,17.355500,78.445500,true
+5867fec5-26f5-498b-879d-6a90b53e7322,Budwel,South Hyderabad,17.345500,78.435500,true
+df21cafc-7476-4546-8cfb-279b1a330737,Rajendra Nagar,South Hyderabad,17.318500,78.405500,true
+9ed53f2c-ceb3-4f14-8cfe-446b5aa5cb0f,Aramghar,South Hyderabad,17.335500,78.415500,true
+79e1b6e4-1582-483e-b94c-f8e59007c798,Langer Houz,South Hyderabad,17.375500,78.415500,true
+01eaf420-4f0e-4845-89e9-705d783c9d29,Masab Tank,Central Hyderabad,17.405500,78.455500,true
+6ab3a450-3bb8-4b96-a0a8-f884309e0033,Basheerbagh,Central Hyderabad,17.398500,78.472500,true
+e3d96405-2ba0-4f08-829b-2065d150da98,Himayatnagar,Central Hyderabad,17.402500,78.485500,true
+f127f8d8-5400-4479-a0bc-84eecb112fdf,RTC Cross Roads,Central Hyderabad,17.405500,78.495500,true
+b0fe352a-4bed-4091-a994-cd637c66dfe8,Kachiguda,Central Hyderabad,17.388500,78.495500,true
+4df88b36-63b7-4e80-98dd-0fac41bce9cb,Amberpet,East Hyderabad,17.392500,78.518500,true
+c392c719-fced-41b3-bc44-8aae9c194608,Ramanthapur,East Hyderabad,17.395500,78.535500,true
+34ede4cd-348f-4954-b58e-104d746b225e,Uppal X Roads,East Hyderabad,17.406000,78.559400,true
+6ba285cd-3d67-4152-b5b0-ef0cfdcfdb1a,Peerzadiguda,East Hyderabad,17.415500,78.575500,true
+b042d915-3634-4e25-9f03-e803eba2f057,Boduppal,East Hyderabad,17.415500,78.585500,true
+e4c8f4ee-4d74-4941-8865-2e04877d6388,Pocharam,East Hyderabad,17.445500,78.655500,true
+3740e41b-d48e-420d-a4d5-114ee2da51c2,Infosys Pocharam,East Hyderabad,17.448500,78.660500,true
+0c257987-e604-41a5-b01f-23801c0b34b3,ECIL,East Hyderabad,17.470500,78.570500,true
+79eb9797-3380-4190-a19f-175fdc41c6db,AS Rao Nagar,North Hyderabad,17.480500,78.555500,true
+79165095-b6ea-4a26-8c69-dfc19884202a,Sainikpuri,North Hyderabad,17.490500,78.535500,true
+b6dd3a56-1a3c-40c6-a92c-fcd5f4ab510c,Yapral,North Hyderabad,17.505500,78.530500,true
+e7d881ee-0637-4add-830f-2e55035bf26e,Bowenpally,Secunderabad,17.465500,78.475500,true
+99e53530-7691-4005-9946-e6efeb99311d,West Marredpally,Secunderabad,17.455500,78.505500,true
+e271648c-13ae-4962-ab54-c18b6bef6cc6,East Marredpally,Secunderabad,17.455500,78.515500,true
+27927ba5-4c13-4a16-9bac-54c84c51c658,Bolarum,North Hyderabad,17.515500,78.515500,true
+3b44b5e1-8967-4de7-aee4-a2d2fb63d275,Suchitra,North Hyderabad,17.525500,78.485500,true
+4532a956-260e-49cd-9a5d-1136bda762d6,Jeedimetla,North Hyderabad,17.515500,78.455500,true
+1fa46793-b049-44a8-9329-e8ecaa8537fc,Dundigal,North Hyderabad,17.575500,78.445500,true
+c0169d2d-9de4-428b-9e35-b13ca958e85c,Suraram,North Hyderabad,17.535500,78.430500,true
+f5993f97-ca72-4a59-870e-ef30709f20a0,Quthbullapur,North Hyderabad,17.505500,78.445500,true
+259c7c9f-00c0-4048-9522-ca5358a9574e,Gajularamaram,North Hyderabad,17.515500,78.420500,true
+6cc656ff-101b-4cb5-840c-e90208d4f42b,Nacharam,East Hyderabad,17.425500,78.555500,true
+f179e8ec-480d-4e6f-91e8-3f450f00307e,Cherlapally,East Hyderabad,17.435500,78.605500,true
+c9f82725-f0d8-46a4-aa8d-3d386c37abc8,Hayathnagar,East Hyderabad,17.325500,78.595500,true
+571ad0fa-6116-41e6-9217-7d697255896b,Vanasthalipuram,East Hyderabad,17.335500,78.575500,true
+b115de7b-503a-4d53-875b-d9f2065f9a25,BN Reddy Nagar,East Hyderabad,17.345500,78.565500,true
+f6efd3c0-04c5-4a4b-b44b-fabd886133c1,Saroornagar,East Hyderabad,17.355500,78.555500,true
+3e8a8b8f-0dc0-428e-9437-550dc3f2bfa3,Karmanghat,South Hyderabad,17.355500,78.525500,true
+b794c3c7-9e52-47ca-8cc4-2a8a543031f6,Champapet,South Hyderabad,17.365500,78.515500,true
+a22502ba-409b-4066-937b-cd5ae99d4bd1,Santosh Nagar,South Hyderabad,17.355500,78.505500,true
+dbf96a7f-8360-4644-9958-f3deb38ceb3f,Saidabad,South Hyderabad,17.365500,78.495500,true
+e493bf75-d0c2-4177-8e7a-f5c21f6cb8ab,Falaknuma,Old City,17.335500,78.475500,true
+6c48b1c5-3291-499f-9101-827603dc908d,Shalibanda,Old City,17.345500,78.465500,true
+62517b14-0a7b-43bf-8893-9cef347da3c3,Yakutpura,Old City,17.355500,78.485500,true
+f4dfac7e-d1ec-4233-8933-3dc8446800ab,Dabirpura,Old City,17.365500,78.485500,true
+bbfe6b12-5533-4ec9-9f2d-ee2a68d6d228,Bahadurpura,Old City,17.355500,78.455500,true
+3d6b1d92-9da8-4e41-8cd0-876ff2604f64,Zoo Park,Old City,17.351500,78.451500,true
