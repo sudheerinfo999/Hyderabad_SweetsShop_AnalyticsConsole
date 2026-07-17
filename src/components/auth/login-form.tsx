@@ -13,6 +13,7 @@ export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const nextPath = params.get("next") || "/dashboard";
+  const isConfigError = params.get("error") === "config";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,6 +42,14 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {isConfigError && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          Supabase environment variables are missing on this deployment. Set{" "}
+          <code className="text-xs">NEXT_PUBLIC_SUPABASE_URL</code>,{" "}
+          <code className="text-xs">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, and{" "}
+          <code className="text-xs">SUPABASE_SERVICE_ROLE_KEY</code>, then redeploy.
+        </div>
+      )}
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
