@@ -373,7 +373,7 @@ export function CustomerForm({ areas, subAreas }: Props) {
                 </div>
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-                    Free 2 pieces offer
+                    Grab Your Gift
                   </p>
                   <Label htmlFor="favourite-sweet" className="text-base font-semibold leading-snug text-foreground">
                     {FAVOURITE_SWEET_PROMPT}{" "}
