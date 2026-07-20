@@ -159,6 +159,7 @@ export default async function CustomersPage({
                   <TableHead>Distance</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Favourite sweet</TableHead>
+                  <TableHead>Review</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead className="w-8"></TableHead>
                 </TableRow>
@@ -186,6 +187,15 @@ export default async function CustomersPage({
                     <TableCell>
                       {c.favourite_sweet ? (
                         <span className="text-sm">{c.favourite_sweet}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="max-w-[200px]">
+                      {c.review ? (
+                        <span className="line-clamp-2 text-sm" title={c.review}>
+                          {c.review}
+                        </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}

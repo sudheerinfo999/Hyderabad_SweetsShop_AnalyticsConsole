@@ -84,6 +84,7 @@ export function ReportsTool({
       "Distance (km)": c.distance_km ?? "",
       "Purchase amount": c.purchase_amount ?? "",
       "Favourite sweet": c.favourite_sweet ?? "",
+      Review: c.review ?? "",
       "Created at": new Date(c.created_at).toISOString(),
     }));
     downloadCsv(`customers-${format(new Date(), "yyyyMMdd-HHmm")}.csv`, rows);
@@ -101,6 +102,7 @@ export function ReportsTool({
           "Distance (km)": c.distance_km ?? "",
           "Purchase amount": c.purchase_amount ?? "",
           "Favourite sweet": c.favourite_sweet ?? "",
+          Review: c.review ?? "",
           "Created at": new Date(c.created_at).toISOString(),
         })),
       },

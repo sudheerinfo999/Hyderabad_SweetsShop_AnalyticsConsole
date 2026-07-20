@@ -83,6 +83,7 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
       full_address,
       purchase_amount: parsed.data.purchase_amount ?? null,
       favourite_sweet: parsed.data.favourite_sweet,
+      review: parsed.data.review ?? null,
       is_estimated_location: true,
       created_by: user.id,
     })

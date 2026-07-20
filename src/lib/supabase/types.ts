@@ -57,6 +57,7 @@ export interface Customer {
   place_id: string | null;
   purchase_amount: number | null;
   favourite_sweet: string | null;
+  review: string | null;
   nearest_branch_id: string | null;
   distance_km: number | null;
   is_estimated_location: boolean;

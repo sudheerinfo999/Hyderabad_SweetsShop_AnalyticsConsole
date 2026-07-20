@@ -37,6 +37,12 @@ export const customerInputSchema = z.object({
       (v) => (FAVOURITE_SWEETS as readonly string[]).includes(v),
       "Pick a sweet from the list",
     ),
+  review: z
+    .string()
+    .trim()
+    .max(1000, "Review is too long (max 1000 characters)")
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : null)),
 });
 
 export type CustomerInput = z.infer<typeof customerInputSchema>;

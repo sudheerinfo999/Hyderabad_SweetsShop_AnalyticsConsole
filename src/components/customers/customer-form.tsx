@@ -9,6 +9,7 @@ import {
   IndianRupee,
   Loader2,
   MapPin,
+  MessageSquare,
   Phone,
   Plus,
   User,
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -73,6 +75,7 @@ export function CustomerForm({ areas, subAreas }: Props) {
   const [subAreaName, setSubAreaName] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [favouriteSweet, setFavouriteSweet] = useState<string | null>(null);
+  const [review, setReview] = useState("");
   const [lastSavedName, setLastSavedName] = useState<string | null>(null);
 
   const [areaDialogOpen, setAreaDialogOpen] = useState(false);
@@ -99,6 +102,7 @@ export function CustomerForm({ areas, subAreas }: Props) {
     setSubAreaName(null);
     setAmount("");
     setFavouriteSweet(null);
+    setReview("");
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -119,6 +123,7 @@ export function CustomerForm({ areas, subAreas }: Props) {
       sub_area: subAreaName && subAreaName !== NONE_SUB ? subAreaName : null,
       purchase_amount: amount.trim() ? Number(amount) : null,
       favourite_sweet: favouriteSweet,
+      review: review.trim() ? review.trim() : undefined,
     };
     startTransition(async () => {
       const result = await createCustomerAction(payload);
@@ -409,6 +414,28 @@ export function CustomerForm({ areas, subAreas }: Props) {
               {errors.favourite_sweet && (
                 <p className="text-xs text-destructive">{errors.favourite_sweet}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="review">Customer review (optional)</Label>
+              <div className="relative">
+                <MessageSquare className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Textarea
+                  id="review"
+                  autoComplete="off"
+                  value={review}
+                  onChange={(e) => setReview(e.target.value)}
+                  placeholder="e.g. Loved the gulab jamun, will visit again…"
+                  className="min-h-[88px] resize-y pl-9"
+                  maxLength={1000}
+                />
+              </div>
+              {errors.review && (
+                <p className="text-xs text-destructive">{errors.review}</p>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Quick feedback from the customer — saved with their entry for later reference.
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
