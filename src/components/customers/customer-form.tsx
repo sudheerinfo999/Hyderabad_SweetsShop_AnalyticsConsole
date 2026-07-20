@@ -409,9 +409,6 @@ export function CustomerForm({ areas, subAreas }: Props) {
               {errors.favourite_sweet && (
                 <p className="text-xs text-destructive">{errors.favourite_sweet}</p>
               )}
-              <p className="text-[11px] text-muted-foreground">
-                Customer picks one sweet from the list and receives 2 free pieces at the counter.
-              </p>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
