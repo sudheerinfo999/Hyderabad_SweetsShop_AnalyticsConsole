@@ -27,4 +27,4 @@ export const FAVOURITE_SWEETS = [
 export type FavouriteSweet = (typeof FAVOURITE_SWEETS)[number];
 
 export const FAVOURITE_SWEET_PROMPT =
-  "Please select your favourite sweet and grab your free piece";
+  "Please select your favorite sweet and grab a free piece on above purchase off 500";
