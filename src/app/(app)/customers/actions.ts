@@ -54,7 +54,7 @@ async function requireSignedInUser() {
 }
 
 /** Normalise Indian mobiles to a 10-digit form for matching. */
-export function normaliseMobile(value: string | null | undefined): string | null {
+function normaliseMobile(value: string | null | undefined): string | null {
   if (!value) return null;
   const digits = value.replace(/\D/g, "");
   if (digits.length >= 10) return digits.slice(-10);
