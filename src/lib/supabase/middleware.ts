@@ -7,7 +7,6 @@ const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth"];
 
 function missingEnvResponse(request: NextRequest) {
   const url = request.nextUrl.clone();
-  // Allow the login page through so we can show a clear configuration message there.
   if (url.pathname.startsWith("/login") || url.pathname.startsWith("/auth")) {
     return NextResponse.next({ request });
   }
@@ -16,18 +15,43 @@ function missingEnvResponse(request: NextRequest) {
   return NextResponse.redirect(url);
 }
 
-async function fetchRole(
+type ProfileSnapshot = {
+  id: string;
+  role: AppRole;
+  email: string | null;
+  full_name: string | null;
+  is_active: boolean;
+};
+
+async function fetchProfileSnapshot(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
-): Promise<AppRole | null> {
+  fallbackEmail?: string | null,
+): Promise<ProfileSnapshot> {
   const { data } = await supabase
     .from("profiles")
-    .select("role")
+    .select("id, role, email, full_name, is_active")
     .eq("id", userId)
     .maybeSingle();
-  const role = data?.role;
-  if (role === "admin" || role === "staff") return role;
-  return null;
+
+  const role: AppRole = data?.role === "admin" ? "admin" : "staff";
+  return {
+    id: userId,
+    role,
+    email: data?.email ?? fallbackEmail ?? null,
+    full_name: data?.full_name ?? null,
+    is_active: data?.is_active ?? true,
+  };
+}
+
+function withProfileHeaders(request: NextRequest, profile: ProfileSnapshot) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-app-user-id", profile.id);
+  requestHeaders.set("x-app-role", profile.role);
+  requestHeaders.set("x-app-email", profile.email ?? "");
+  requestHeaders.set("x-app-name", profile.full_name ?? "");
+  requestHeaders.set("x-app-active", profile.is_active ? "true" : "false");
+  return requestHeaders;
 }
 
 export async function updateSession(request: NextRequest) {
@@ -75,25 +99,27 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (user) {
-      const role = (await fetchRole(supabase, user.id)) ?? "staff";
+      const profile = await fetchProfileSnapshot(supabase, user.id, user.email);
+      const requestHeaders = withProfileHeaders(request, profile);
 
       if (url.pathname === "/login") {
-        url.pathname = homePathForRole(role);
+        url.pathname = homePathForRole(profile.role);
         url.search = "";
         return NextResponse.redirect(url);
       }
 
-      if (!isPublic && !canAccessPath(role, url.pathname)) {
-        url.pathname = homePathForRole(role);
+      if (!isPublic && !canAccessPath(profile.role, url.pathname)) {
+        url.pathname = homePathForRole(profile.role);
         url.search = "";
         return NextResponse.redirect(url);
       }
+
+      return NextResponse.next({ request: { headers: requestHeaders } });
     }
 
     return response;
   } catch (error) {
     console.error("[middleware] session update failed:", error);
-    // Fail open to the login page instead of crashing the whole request with 500.
     return missingEnvResponse(request);
   }
 }

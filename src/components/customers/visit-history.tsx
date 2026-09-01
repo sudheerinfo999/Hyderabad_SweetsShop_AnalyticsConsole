@@ -31,6 +31,7 @@ export function VisitHistoryButton({ customerId, customerName, visitCount }: Pro
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [visits, setVisits] = useState<CustomerVisitRow[]>([]);
+  const [displayCount, setDisplayCount] = useState(visitCount);
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -49,6 +50,10 @@ export function VisitHistoryButton({ customerId, customerName, visitCount }: Pro
       setLoading(false);
     }
   }, [customerId]);
+
+  useEffect(() => {
+    setDisplayCount(visitCount);
+  }, [visitCount]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,8 +86,10 @@ export function VisitHistoryButton({ customerId, customerName, visitCount }: Pro
         router.refresh();
         return;
       }
+      if (result.remainingVisits != null) {
+        setDisplayCount(result.remainingVisits);
+      }
       await loadVisits();
-      router.refresh();
     });
   }
 
@@ -95,7 +102,7 @@ export function VisitHistoryButton({ customerId, customerName, visitCount }: Pro
         title="View visit history"
       >
         <Badge variant="outline" className="cursor-pointer hover:bg-accent">
-          {visitCount}
+          {displayCount}
           <History className="ml-1 h-3 w-3 opacity-70" />
         </Badge>
       </button>
@@ -121,9 +128,9 @@ export function VisitHistoryButton({ customerId, customerName, visitCount }: Pro
             </p>
           ) : (
             <div className="space-y-3">
-              {visits.length !== visitCount && (
+              {visits.length !== displayCount && (
                 <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-                  Listed visits ({visits.length}) differ from the stored visit count ({visitCount}).
+                  Listed visits ({visits.length}) differ from the stored visit count ({displayCount}).
                   Deleting or re-saving will resync totals from this list.
                 </p>
               )}

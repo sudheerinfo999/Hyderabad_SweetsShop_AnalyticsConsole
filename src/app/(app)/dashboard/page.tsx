@@ -30,10 +30,11 @@ import {
   aggregateDaily,
 } from "@/lib/analytics/aggregations";
 import {
+  daysAgoIso,
   fetchActiveBranches,
   fetchAllAreas,
+  fetchAnalyticsCustomers,
   fetchCustomerVisits,
-  fetchCustomers,
   fetchKpiSummary,
 } from "@/lib/analytics/queries";
 import { generateRecommendations } from "@/lib/analytics/recommendations";
@@ -47,8 +48,8 @@ export default async function DashboardPage() {
   await requireAdmin();
   const [kpis, customers, visits, branches, areasMaster] = await Promise.all([
     fetchKpiSummary(),
-    fetchCustomers({ limit: 5000 }),
-    fetchCustomerVisits({ limit: 20000 }),
+    fetchAnalyticsCustomers(3000),
+    fetchCustomerVisits({ from: daysAgoIso(30), limit: 5000 }),
     fetchActiveBranches(),
     fetchAllAreas(),
   ]);

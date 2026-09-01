@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { areaInputSchema, subAreaInputSchema } from "@/lib/validation";
 
 interface Result {
@@ -34,11 +35,10 @@ async function requireAdminClient() {
 }
 
 function revalidateMaster() {
+  revalidateTag(CACHE_TAGS.masterData);
+  revalidateTag(CACHE_TAGS.analytics);
   revalidatePath("/master-data");
   revalidatePath("/customers/new");
-  revalidatePath("/dashboard");
-  revalidatePath("/recommendations");
-  revalidatePath("/analytics");
 }
 
 export async function upsertAreaAction(input: unknown, id?: string | null): Promise<Result> {

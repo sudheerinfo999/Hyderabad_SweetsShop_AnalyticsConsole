@@ -18,7 +18,7 @@ import {
   aggregateByDistanceBucket,
   aggregateBySubArea,
 } from "@/lib/analytics/aggregations";
-import { fetchActiveBranches, fetchCustomers } from "@/lib/analytics/queries";
+import { fetchActiveBranches, fetchAnalyticsCustomers } from "@/lib/analytics/queries";
 import { requireAdmin } from "@/lib/auth";
 import { formatCurrency, formatKm, formatNumber, formatPercent } from "@/lib/utils";
 
@@ -31,7 +31,7 @@ export const metadata = {
 export default async function AnalyticsPage() {
   await requireAdmin();
   const [customers, branches] = await Promise.all([
-    fetchCustomers({ limit: 10000 }),
+    fetchAnalyticsCustomers(5000),
     fetchActiveBranches(),
   ]);
 

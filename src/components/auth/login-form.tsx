@@ -20,6 +20,7 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,16 +49,19 @@ export function LoginForm() {
       const nextPath =
         requestedNext && canAccessPath(role, requestedNext) ? requestedNext : home;
 
+      setRedirecting(true);
       toast.success("Welcome back!");
       router.replace(nextPath);
-      router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign-in failed";
       toast.error(message);
+      setRedirecting(false);
     } finally {
       setIsLoading(false);
     }
   }
+
+  const busy = isLoading || redirecting;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -77,6 +81,7 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           required
+          disabled={busy}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@hyderabadsweets.local"
@@ -90,14 +95,15 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
+          disabled={busy}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
         />
       </div>
-      <Button type="submit" variant="maroon" size="lg" className="w-full" disabled={isLoading}>
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
-        Sign in
+      <Button type="submit" variant="maroon" size="lg" className="w-full" disabled={busy}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+        {redirecting ? "Opening workspace…" : "Sign in"}
       </Button>
     </form>
   );

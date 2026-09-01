@@ -1,11 +1,13 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import {
   customAreaQuickSchema,
   customSubAreaQuickSchema,
   customerInputSchema,
 } from "@/lib/validation";
+import { fetchAllAreas } from "@/lib/analytics/queries";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Customer, HyderabadArea, HyderabadSubArea } from "@/lib/supabase/types";
@@ -70,9 +72,14 @@ function buildFullAddress(mainArea: string, subArea: string | null | undefined) 
   return subArea ? `${subArea}, ${mainArea}, Hyderabad` : `${mainArea}, Hyderabad`;
 }
 
-function revalidateCustomerPaths() {
+function revalidateAfterCounterSave() {
+  revalidateTag(CACHE_TAGS.customersList);
+}
+
+function revalidateAfterAdminDataChange() {
+  revalidateTag(CACHE_TAGS.analytics);
+  revalidateTag(CACHE_TAGS.customersList);
   revalidatePath("/customers");
-  revalidatePath("/customers/new");
   revalidatePath("/dashboard");
   revalidatePath("/analytics");
   revalidatePath("/reports");
@@ -82,45 +89,8 @@ function revalidateCustomerPaths() {
 const MATCH_SELECT =
   "id, customer_name, mobile_number, main_area, sub_area, favourite_sweet, review, visit_count, purchase_amount, created_at";
 
-type MatchRow = Omit<CustomerMatch, "last_visited_at"> & { created_at?: string };
-
 /**
- * Attach latest visit time per customer (from customer_visits), falling back to created_at.
- */
-async function attachLastVisited(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  rows: MatchRow[],
-): Promise<CustomerMatch[]> {
-  if (rows.length === 0) return [];
-
-  const ids = rows.map((r) => r.id);
-  const latestByCustomer = new Map<string, string>();
-
-  const { data: visits, error: visitErr } = await supabase
-    .from("customer_visits")
-    .select("customer_id, created_at")
-    .in("customer_id", ids)
-    .order("created_at", { ascending: false });
-
-  if (!visitErr) {
-    for (const visit of visits ?? []) {
-      if (!visit.customer_id || !visit.created_at) continue;
-      if (!latestByCustomer.has(visit.customer_id)) {
-        latestByCustomer.set(visit.customer_id, visit.created_at);
-      }
-    }
-  }
-
-  return rows.map((row) => ({
-    ...row,
-    last_visited_at: latestByCustomer.get(row.id) ?? row.created_at ?? null,
-  }));
-}
-
-/**
- * Predictive search for the counter form (suggestions only — never auto-binds a customer).
- * - Name: from 2 characters (prefix / contains match)
- * - Mobile: from 6 digits (partial match on stored numbers)
+ * Predictive search — single RPC round-trip (see migration 0005_performance.sql).
  */
 export async function searchCustomersAction(input: {
   customer_name?: string;
@@ -136,58 +106,18 @@ export async function searchCustomersAction(input: {
     return { ok: true, customers: [] };
   }
 
-  const { supabase } = auth;
-  const seen = new Set<string>();
-  const results: MatchRow[] = [];
+  const { data, error } = await auth.supabase.rpc("search_customers_counter", {
+    p_name: name.length >= 2 ? name : null,
+    p_mobile_digits: digits.length >= 6 ? digits : null,
+    p_limit: 8,
+  });
 
-  function pushRows(rows: MatchRow[] | null | undefined) {
-    for (const row of rows ?? []) {
-      if (seen.has(row.id)) continue;
-      seen.add(row.id);
-      results.push(row);
-    }
+  if (error) {
+    console.error("search_customers_counter RPC failed:", error.message);
+    return { ok: false, message: "Search temporarily unavailable." };
   }
 
-  if (name.length >= 2) {
-    // Prefer prefix matches ("Sai" → Sai Sudheer…), then broader contains.
-    const { data: prefixHits } = await supabase
-      .from("customers")
-      .select(MATCH_SELECT)
-      .ilike("customer_name", `${name}%`)
-      .order("customer_name", { ascending: true })
-      .limit(8);
-    pushRows(prefixHits as MatchRow[] | null);
-
-    if (results.length < 8) {
-      const { data: containsHits } = await supabase
-        .from("customers")
-        .select(MATCH_SELECT)
-        .ilike("customer_name", `%${name}%`)
-        .order("customer_name", { ascending: true })
-        .limit(8);
-      pushRows(containsHits as MatchRow[] | null);
-    }
-  }
-
-  if (digits.length >= 6) {
-    const { data: mobileHits } = await supabase
-      .from("customers")
-      .select(MATCH_SELECT)
-      .not("mobile_number", "is", null)
-      .ilike("mobile_number", `%${digits}%`)
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    const filtered = ((mobileHits ?? []) as MatchRow[]).filter((row) => {
-      const normalised = normaliseMobile(row.mobile_number);
-      return normalised != null && normalised.includes(digits);
-    });
-    pushRows(filtered);
-  }
-
-  const sliced = results.slice(0, 8);
-  const customers = await attachLastVisited(supabase, sliced);
-  return { ok: true, customers };
+  return { ok: true, customers: (data ?? []) as CustomerMatch[] };
 }
 
 export async function createCustomerAction(input: unknown): Promise<ActionResult> {
@@ -205,14 +135,9 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
   if (!auth.ok) return { ok: false, message: auth.message };
   const { user, supabase } = auth;
 
-  // Verify the area is in our HMR master list (server-side validation).
-  const { data: areaRow, error: areaErr } = await supabase
-    .from("hyderabad_areas")
-    .select("area_name, is_active")
-    .eq("area_name", parsed.data.main_area)
-    .maybeSingle();
-
-  if (areaErr) return { ok: false, message: areaErr.message };
+  // Area list is cached (5 min) — avoids a cold DB hit on every counter save.
+  const areas = await fetchAllAreas();
+  const areaRow = areas.find((a) => a.area_name === parsed.data.main_area);
   if (!areaRow || !areaRow.is_active) {
     return {
       ok: false,
@@ -278,7 +203,7 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
     });
     if (visitErr) return { ok: false, message: visitErr.message };
 
-    revalidateCustomerPaths();
+    revalidateAfterCounterSave();
     return {
       ok: true,
       id: existing.id,
@@ -315,7 +240,7 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
   });
   if (visitErr) return { ok: false, message: visitErr.message };
 
-  revalidateCustomerPaths();
+  revalidateAfterCounterSave();
   return { ok: true, id: data.id, returning: false, visitCount: 1 };
 }
 
@@ -334,9 +259,7 @@ export async function deleteCustomerAction(id: string): Promise<ActionResult> {
 
   const { error } = await auth.supabase.from("customers").delete().eq("id", id);
   if (error) return { ok: false, message: error.message };
-  revalidatePath("/customers");
-  revalidatePath("/dashboard");
-  revalidatePath("/analytics");
+  revalidateAfterAdminDataChange();
   return { ok: true };
 }
 
@@ -429,7 +352,7 @@ export async function deleteCustomerVisitAction(
       .eq("id", customerId);
     if (custDelErr) return { ok: false, message: custDelErr.message };
 
-    revalidateCustomerPaths();
+    revalidateAfterAdminDataChange();
     return {
       ok: true,
       remainingVisits: 0,
@@ -453,7 +376,7 @@ export async function deleteCustomerVisitAction(
 
   if (syncErr) return { ok: false, message: syncErr.message };
 
-  revalidateCustomerPaths();
+  revalidateAfterAdminDataChange();
   return {
     ok: true,
     remainingVisits: left.length,
@@ -601,11 +524,7 @@ export async function createCustomSubAreaAction(input: unknown): Promise<ActionR
 }
 
 function revalidateAfterAreaChange() {
-  revalidatePath("/customers");
+  revalidateTag(CACHE_TAGS.masterData);
   revalidatePath("/customers/new");
   revalidatePath("/master-data");
-  revalidatePath("/dashboard");
-  revalidatePath("/recommendations");
-  revalidatePath("/analytics");
-  revalidatePath("/branches");
 }

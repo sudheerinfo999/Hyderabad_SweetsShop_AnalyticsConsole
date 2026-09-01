@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   fetchActiveBranches,
   fetchAllAreas,
-  fetchCustomers,
+  fetchAnalyticsCustomers,
 } from "@/lib/analytics/queries";
 import {
   RECOMMENDATION_DEFAULT_COVERAGE_RADIUS_KM,
@@ -41,7 +41,7 @@ function ScoreBar({ label, score }: { label: string; score: number }) {
 export default async function RecommendationsPage() {
   await requireAdmin();
   const [customers, branches, areas] = await Promise.all([
-    fetchCustomers({ limit: 10000 }),
+    fetchAnalyticsCustomers(5000),
     fetchActiveBranches(),
     fetchAllAreas(),
   ]);

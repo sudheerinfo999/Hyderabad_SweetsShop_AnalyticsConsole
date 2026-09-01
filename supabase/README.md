@@ -12,6 +12,7 @@ psql "$SUPABASE_CONNECTION_STRING" -f supabase/migrations/0001_init.sql
 psql "$SUPABASE_CONNECTION_STRING" -f supabase/migrations/0002_favourite_sweet.sql
 psql "$SUPABASE_CONNECTION_STRING" -f supabase/migrations/0003_customer_review.sql
 psql "$SUPABASE_CONNECTION_STRING" -f supabase/migrations/0004_customer_visits.sql
+psql "$SUPABASE_CONNECTION_STRING" -f supabase/migrations/0005_performance.sql
 psql "$SUPABASE_CONNECTION_STRING" -f supabase/seed.sql
 ```
 
@@ -27,6 +28,10 @@ The migration is idempotent — running it twice will not duplicate rows.
 `0004_customer_visits.sql` adds `visit_count` on `customers`, a `customer_visits`
 ledger (for daily revenue on return visits), and allows staff to update customer
 rows when recording a returning visit.
+
+`0005_performance.sql` adds trigram search indexes, a visit lookup index, and the
+`search_customers_counter()` RPC used by the Add Customer predictive search (one
+DB round-trip instead of multiple queries).
 
 ## 2. Create your first admin user
 

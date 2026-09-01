@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportsTool } from "@/components/reports/reports-tool";
-import { fetchActiveBranches, fetchAllAreas, fetchCustomers } from "@/lib/analytics/queries";
+import { fetchActiveBranches, fetchAllAreas, fetchAnalyticsCustomers } from "@/lib/analytics/queries";
 import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const metadata = {
 export default async function ReportsPage() {
   await requireAdmin();
   const [customers, branches, areas] = await Promise.all([
-    fetchCustomers({ limit: 20000 }),
+    fetchAnalyticsCustomers(8000),
     fetchActiveBranches(),
     fetchAllAreas(),
   ]);

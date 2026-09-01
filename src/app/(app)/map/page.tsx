@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CityMap } from "@/components/map/city-map";
 import { aggregateByArea } from "@/lib/analytics/aggregations";
-import { fetchActiveBranches, fetchAllAreas, fetchCustomers } from "@/lib/analytics/queries";
+import { fetchActiveBranches, fetchAllAreas, fetchAnalyticsCustomers } from "@/lib/analytics/queries";
 import { generateRecommendations } from "@/lib/analytics/recommendations";
 import { requireAdmin } from "@/lib/auth";
 
@@ -14,7 +14,7 @@ export const metadata = {
 export default async function MapPage() {
   await requireAdmin();
   const [customers, branches, areas] = await Promise.all([
-    fetchCustomers({ limit: 10000 }),
+    fetchAnalyticsCustomers(5000),
     fetchActiveBranches(),
     fetchAllAreas(),
   ]);

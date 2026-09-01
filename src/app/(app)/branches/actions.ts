@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { branchInputSchema } from "@/lib/validation";
 
 interface Result {
@@ -37,6 +38,15 @@ async function requireAdmin() {
   return { ok: true, supabase } as const;
 }
 
+function revalidateBranchData() {
+  revalidateTag(CACHE_TAGS.masterData);
+  revalidateTag(CACHE_TAGS.analytics);
+  revalidatePath("/branches");
+  revalidatePath("/dashboard");
+  revalidatePath("/map");
+  revalidatePath("/recommendations");
+}
+
 export async function upsertBranchAction(
   input: unknown,
   id?: string | null,
@@ -65,10 +75,7 @@ export async function upsertBranchAction(
     if (error) return { ok: false, message: error.message };
   }
 
-  revalidatePath("/branches");
-  revalidatePath("/dashboard");
-  revalidatePath("/map");
-  revalidatePath("/recommendations");
+  revalidateBranchData();
   return { ok: true };
 }
 
@@ -79,9 +86,7 @@ export async function deleteBranchAction(id: string): Promise<Result> {
   const { error } = await auth.supabase.from("shop_branches").delete().eq("id", id);
   if (error) return { ok: false, message: error.message };
 
-  revalidatePath("/branches");
-  revalidatePath("/dashboard");
-  revalidatePath("/map");
+  revalidateBranchData();
   return { ok: true };
 }
 
@@ -95,6 +100,8 @@ export async function toggleBranchActiveAction(id: string, isActive: boolean): P
     .eq("id", id);
   if (error) return { ok: false, message: error.message };
 
+  revalidateTag(CACHE_TAGS.masterData);
+  revalidateTag(CACHE_TAGS.analytics);
   revalidatePath("/branches");
   return { ok: true };
 }

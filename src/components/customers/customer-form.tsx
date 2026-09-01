@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -59,7 +58,6 @@ interface Props {
 const NONE_SUB = "__none__";
 
 export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isAreaPending, startAreaTransition] = useTransition();
   const [isSubPending, startSubTransition] = useTransition();
@@ -219,7 +217,7 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
     (opts: { name?: string; phone?: string; field: "name" | "mobile" }) => {
       if (suppressSearchRef.current) return;
       if (searchTimer.current) clearTimeout(searchTimer.current);
-      searchTimer.current = setTimeout(() => runSearch(opts), 280);
+      searchTimer.current = setTimeout(() => runSearch(opts), 350);
     },
     [runSearch],
   );
@@ -319,7 +317,6 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
         toast.success(`${customerName} saved as a new customer!`);
       }
       resetForm();
-      router.refresh();
     });
   }
 
@@ -348,7 +345,6 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
       setCustomAreaName("");
       setCustomZoneName("");
       toast.success(result.message ?? `"${result.area.area_name}" added and selected`);
-      router.refresh();
     });
   }
 
@@ -377,7 +373,6 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
       setSubDialogOpen(false);
       setCustomSubName("");
       toast.success(result.message ?? `"${result.subArea.sub_area_name}" added and selected`);
-      router.refresh();
     });
   }
 

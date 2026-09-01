@@ -11,7 +11,7 @@ import { generateInsights } from "@/lib/analytics/insights";
 import {
   fetchActiveBranches,
   fetchAllAreas,
-  fetchCustomers,
+  fetchAnalyticsCustomers,
   fetchKpiSummary,
 } from "@/lib/analytics/queries";
 import { generateRecommendations } from "@/lib/analytics/recommendations";
@@ -27,7 +27,7 @@ export default async function InsightsPage() {
   await requireAdmin();
   const [kpis, customers, branches, areas] = await Promise.all([
     fetchKpiSummary(),
-    fetchCustomers({ limit: 10000 }),
+    fetchAnalyticsCustomers(5000),
     fetchActiveBranches(),
     fetchAllAreas(),
   ]);

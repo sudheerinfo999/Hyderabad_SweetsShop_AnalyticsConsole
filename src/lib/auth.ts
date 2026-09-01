@@ -1,18 +1,32 @@
+import { cache } from "react";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { homePathForRole } from "@/lib/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { Profile } from "@/lib/supabase/types";
+import type { AppRole, Profile } from "@/lib/supabase/types";
 
-export async function requireUser() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  return user;
+async function profileFromHeaders(): Promise<Profile | null> {
+  const h = await headers();
+  const id = h.get("x-app-user-id");
+  if (!id) return null;
+  const role = h.get("x-app-role");
+  const appRole: AppRole = role === "admin" ? "admin" : "staff";
+  return {
+    id,
+    role: appRole,
+    email: h.get("x-app-email") || null,
+    full_name: h.get("x-app-name") || null,
+    is_active: h.get("x-app-active") !== "false",
+    created_at: "",
+    updated_at: "",
+  };
 }
 
-export async function getCurrentProfile(): Promise<Profile | null> {
+/** Deduped per request — middleware injects profile headers to skip extra DB round-trips. */
+export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
+  const fromMiddleware = await profileFromHeaders();
+  if (fromMiddleware) return fromMiddleware;
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -29,7 +43,16 @@ export async function getCurrentProfile(): Promise<Profile | null> {
     return null;
   }
   return data;
-}
+});
+
+export const requireUser = cache(async () => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  return user;
+});
 
 export async function requireProfile(): Promise<Profile> {
   const profile = await getCurrentProfile();
