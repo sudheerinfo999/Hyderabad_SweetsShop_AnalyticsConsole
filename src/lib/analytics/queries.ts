@@ -155,7 +155,7 @@ export const fetchKpiSummary = cache(async function fetchKpiSummary(): Promise<K
 
 const fetchKpiSummaryCached = unstable_cache(
   async (): Promise<KpiSummary> => {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
   const sixtyDaysAgo = daysAgoIso(60);
 
   const [
