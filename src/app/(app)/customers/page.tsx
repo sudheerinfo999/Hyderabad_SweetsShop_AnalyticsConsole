@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CustomerRowActions } from "@/components/customers/row-actions";
+import { VisitHistoryButton } from "@/components/customers/visit-history";
 import { fetchActiveBranches, fetchAllAreas } from "@/lib/analytics/queries";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -78,7 +79,8 @@ export default async function CustomersPage({
         <div>
           <h1 className="font-display text-2xl font-semibold sm:text-3xl">Customers</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {totalCount.toLocaleString()} entries · search, filter, and review
+            {totalCount.toLocaleString()} entries · click a Visits count to see every visit date and
+            delete a specific visit
           </p>
         </div>
         <Button asChild variant="maroon">
@@ -161,7 +163,7 @@ export default async function CustomersPage({
                   <TableHead>Amount</TableHead>
                   <TableHead>Favourite sweet</TableHead>
                   <TableHead>Review</TableHead>
-                  <TableHead>Date</TableHead>
+                  <TableHead>First entry</TableHead>
                   <TableHead className="w-8"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -185,7 +187,15 @@ export default async function CustomersPage({
                     </TableCell>
                     <TableCell>{formatKm(c.distance_km != null ? Number(c.distance_km) : null)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{c.visit_count ?? 1}</Badge>
+                      {canDelete ? (
+                        <VisitHistoryButton
+                          customerId={c.id}
+                          customerName={c.customer_name}
+                          visitCount={c.visit_count ?? 1}
+                        />
+                      ) : (
+                        <Badge variant="outline">{c.visit_count ?? 1}</Badge>
+                      )}
                     </TableCell>
                     <TableCell>{formatCurrency(c.purchase_amount != null ? Number(c.purchase_amount) : null)}</TableCell>
                     <TableCell>
@@ -212,7 +222,11 @@ export default async function CustomersPage({
                     </TableCell>
                     <TableCell>
                       {canDelete ? (
-                        <CustomerRowActions id={c.id} name={c.customer_name} />
+                        <CustomerRowActions
+                          id={c.id}
+                          name={c.customer_name}
+                          visitCount={c.visit_count ?? 1}
+                        />
                       ) : (
                         <Trash2 className="h-4 w-4 text-muted-foreground/40" />
                       )}

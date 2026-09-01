@@ -15,12 +15,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { deleteCustomerAction } from "@/app/(app)/customers/actions";
 
-export function CustomerRowActions({ id, name }: { id: string; name: string }) {
+export function CustomerRowActions({
+  id,
+  name,
+  visitCount,
+}: {
+  id: string;
+  name: string;
+  visitCount: number;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   function onDelete() {
-    if (!window.confirm(`Delete customer "${name}"? This cannot be undone.`)) return;
+    if (
+      !window.confirm(
+        `Delete customer "${name}" and all ${visitCount} visit${visitCount === 1 ? "" : "s"}? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
     startTransition(async () => {
       const result = await deleteCustomerAction(id);
       if (!result.ok) {
@@ -43,7 +57,7 @@ export function CustomerRowActions({ id, name }: { id: string; name: string }) {
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onDelete} className="text-destructive">
-          <Trash2 className="mr-2 h-4 w-4" /> Delete
+          <Trash2 className="mr-2 h-4 w-4" /> Delete customer
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

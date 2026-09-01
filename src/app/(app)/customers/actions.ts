@@ -320,13 +320,146 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
 }
 
 export async function deleteCustomerAction(id: string): Promise<ActionResult> {
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("customers").delete().eq("id", id);
+  const auth = await requireSignedInUser();
+  if (!auth.ok) return { ok: false, message: auth.message };
+
+  const { data: profile } = await auth.supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+  if (profile?.role !== "admin") {
+    return { ok: false, message: "Only admins can delete customers." };
+  }
+
+  const { error } = await auth.supabase.from("customers").delete().eq("id", id);
   if (error) return { ok: false, message: error.message };
   revalidatePath("/customers");
   revalidatePath("/dashboard");
   revalidatePath("/analytics");
   return { ok: true };
+}
+
+export type CustomerVisitRow = {
+  id: string;
+  customer_id: string;
+  purchase_amount: number | null;
+  created_at: string;
+};
+
+/** Admin: list every visit for a customer (newest first). */
+export async function listCustomerVisitsAction(
+  customerId: string,
+): Promise<ActionResult & { visits?: CustomerVisitRow[]; customerDeleted?: boolean }> {
+  const auth = await requireSignedInUser();
+  if (!auth.ok) return { ok: false, message: auth.message };
+
+  const { data: profile } = await auth.supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+  if (profile?.role !== "admin") {
+    return { ok: false, message: "Only admins can view visit history." };
+  }
+
+  const { data, error } = await auth.supabase
+    .from("customer_visits")
+    .select("id, customer_id, purchase_amount, created_at")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false });
+
+  if (error) return { ok: false, message: error.message };
+  return { ok: true, visits: (data ?? []) as CustomerVisitRow[] };
+}
+
+/**
+ * Admin: delete one visit and resync visit_count + lifetime purchase_amount.
+ * If it was the last visit, the customer record is removed (visit_count must stay >= 1).
+ */
+export async function deleteCustomerVisitAction(
+  visitId: string,
+): Promise<
+  ActionResult & {
+    remainingVisits?: number;
+    customerDeleted?: boolean;
+  }
+> {
+  const auth = await requireSignedInUser();
+  if (!auth.ok) return { ok: false, message: auth.message };
+
+  const { data: profile } = await auth.supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+  if (profile?.role !== "admin") {
+    return { ok: false, message: "Only admins can delete visits." };
+  }
+
+  const { data: visit, error: visitLookupErr } = await auth.supabase
+    .from("customer_visits")
+    .select("id, customer_id, purchase_amount, created_at")
+    .eq("id", visitId)
+    .maybeSingle();
+
+  if (visitLookupErr) return { ok: false, message: visitLookupErr.message };
+  if (!visit) return { ok: false, message: "Visit not found (already deleted?)." };
+
+  const customerId = visit.customer_id as string;
+
+  const { error: deleteErr } = await auth.supabase
+    .from("customer_visits")
+    .delete()
+    .eq("id", visitId);
+  if (deleteErr) return { ok: false, message: deleteErr.message };
+
+  const { data: remaining, error: remErr } = await auth.supabase
+    .from("customer_visits")
+    .select("id, purchase_amount")
+    .eq("customer_id", customerId);
+
+  if (remErr) return { ok: false, message: remErr.message };
+
+  const left = remaining ?? [];
+  if (left.length === 0) {
+    const { error: custDelErr } = await auth.supabase
+      .from("customers")
+      .delete()
+      .eq("id", customerId);
+    if (custDelErr) return { ok: false, message: custDelErr.message };
+
+    revalidateCustomerPaths();
+    return {
+      ok: true,
+      remainingVisits: 0,
+      customerDeleted: true,
+      message: "Last visit removed — customer record deleted.",
+    };
+  }
+
+  const totalAmount = left.reduce((sum, row) => {
+    const n = row.purchase_amount != null ? Number(row.purchase_amount) : 0;
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+
+  const { error: syncErr } = await auth.supabase
+    .from("customers")
+    .update({
+      visit_count: left.length,
+      purchase_amount: totalAmount > 0 ? totalAmount : null,
+    })
+    .eq("id", customerId);
+
+  if (syncErr) return { ok: false, message: syncErr.message };
+
+  revalidateCustomerPaths();
+  return {
+    ok: true,
+    remainingVisits: left.length,
+    customerDeleted: false,
+    message: `Visit deleted. ${left.length} visit${left.length === 1 ? "" : "s"} remaining.`,
+  };
 }
 
 /**
