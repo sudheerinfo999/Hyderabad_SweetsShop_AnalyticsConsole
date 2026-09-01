@@ -21,6 +21,7 @@ export interface ActionResult {
   returning?: boolean;
   visitCount?: number;
   customer?: CustomerMatch;
+  customers?: CustomerMatch[];
 }
 
 export type CustomerMatch = Pick<
@@ -154,6 +155,77 @@ export async function lookupCustomerAction(input: {
   return { ok: true, customer: match ?? undefined };
 }
 
+/**
+ * Predictive search for the counter form.
+ * - Name: from 2 characters (prefix / contains match)
+ * - Mobile: from 6 digits (partial match on stored numbers)
+ */
+export async function searchCustomersAction(input: {
+  customer_name?: string;
+  mobile_number?: string;
+}): Promise<ActionResult> {
+  const auth = await requireSignedInUser();
+  if (!auth.ok) return { ok: false, message: auth.message };
+
+  const name = input.customer_name?.trim() ?? "";
+  const digits = (input.mobile_number ?? "").replace(/\D/g, "");
+
+  if (name.length < 2 && digits.length < 6) {
+    return { ok: true, customers: [] };
+  }
+
+  const { supabase } = auth;
+  const seen = new Set<string>();
+  const results: CustomerMatch[] = [];
+
+  function pushRows(rows: CustomerMatch[] | null | undefined) {
+    for (const row of rows ?? []) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      results.push(row as CustomerMatch);
+    }
+  }
+
+  if (name.length >= 2) {
+    // Prefer prefix matches ("Sai" → Sai Sudheer…), then broader contains.
+    const { data: prefixHits } = await supabase
+      .from("customers")
+      .select(MATCH_SELECT)
+      .ilike("customer_name", `${name}%`)
+      .order("customer_name", { ascending: true })
+      .limit(8);
+    pushRows(prefixHits as CustomerMatch[] | null);
+
+    if (results.length < 8) {
+      const { data: containsHits } = await supabase
+        .from("customers")
+        .select(MATCH_SELECT)
+        .ilike("customer_name", `%${name}%`)
+        .order("customer_name", { ascending: true })
+        .limit(8);
+      pushRows(containsHits as CustomerMatch[] | null);
+    }
+  }
+
+  if (digits.length >= 6) {
+    const { data: mobileHits } = await supabase
+      .from("customers")
+      .select(MATCH_SELECT)
+      .not("mobile_number", "is", null)
+      .ilike("mobile_number", `%${digits}%`)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const filtered = ((mobileHits ?? []) as CustomerMatch[]).filter((row) => {
+      const normalised = normaliseMobile(row.mobile_number);
+      return normalised != null && normalised.includes(digits);
+    });
+    pushRows(filtered);
+  }
+
+  return { ok: true, customers: results.slice(0, 8) };
+}
+
 export async function createCustomerAction(input: unknown): Promise<ActionResult> {
   const parsed = customerInputSchema.safeParse(input);
   if (!parsed.success) {
@@ -188,10 +260,21 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
   const full_address = buildFullAddress(parsed.data.main_area, parsed.data.sub_area);
   const amount = parsed.data.purchase_amount ?? null;
 
-  const existing = await findExistingCustomer(supabase, {
-    customer_name: parsed.data.customer_name,
-    mobile_number: parsed.data.mobile_number ?? null,
-  });
+  let existing: CustomerMatch | null = null;
+  if (parsed.data.existing_customer_id) {
+    const { data: byId } = await supabase
+      .from("customers")
+      .select(MATCH_SELECT)
+      .eq("id", parsed.data.existing_customer_id)
+      .maybeSingle();
+    existing = (byId as CustomerMatch | null) ?? null;
+  }
+  if (!existing) {
+    existing = await findExistingCustomer(supabase, {
+      customer_name: parsed.data.customer_name,
+      mobile_number: parsed.data.mobile_number ?? null,
+    });
+  }
 
   if (existing) {
     const nextVisitCount = Number(existing.visit_count ?? 1) + 1;

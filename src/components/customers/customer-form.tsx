@@ -15,6 +15,7 @@ import {
   RefreshCw,
   User,
   UserCheck,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +43,7 @@ import {
   createCustomAreaAction,
   createCustomSubAreaAction,
   createCustomerAction,
-  lookupCustomerAction,
+  searchCustomersAction,
   type CustomerMatch,
 } from "@/app/(app)/customers/actions";
 import { FAVOURITE_SWEET_PROMPT, FAVOURITE_SWEETS } from "@/lib/sweets";
@@ -61,7 +62,7 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
   const [isPending, startTransition] = useTransition();
   const [isAreaPending, startAreaTransition] = useTransition();
   const [isSubPending, startSubTransition] = useTransition();
-  const [isLookingUp, startLookupTransition] = useTransition();
+  const [isSearching, startSearchTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [localAreas, setLocalAreas] = useState(areas);
@@ -85,8 +86,15 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
   const [lastSavedName, setLastSavedName] = useState<string | null>(null);
   const [lastVisitCount, setLastVisitCount] = useState<number | null>(null);
   const [matchedCustomer, setMatchedCustomer] = useState<CustomerMatch | null>(null);
-  const lookupSeq = useRef(0);
-  const skipNextLookup = useRef(false);
+  const [suggestions, setSuggestions] = useState<CustomerMatch[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [activeField, setActiveField] = useState<"name" | "mobile" | null>(null);
+  const searchSeq = useRef(0);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** After Clear, ignore timers/in-flight searches until the user types again. */
+  const suppressSearchRef = useRef(false);
+  const nameWrapRef = useRef<HTMLDivElement>(null);
+  const mobileWrapRef = useRef<HTMLDivElement>(null);
 
   const [areaDialogOpen, setAreaDialogOpen] = useState(false);
   const [customAreaName, setCustomAreaName] = useState("");
@@ -106,9 +114,18 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
     [localSubAreas, selectedArea],
   );
 
+  function cancelPendingSearch() {
+    if (searchTimer.current) {
+      clearTimeout(searchTimer.current);
+      searchTimer.current = null;
+    }
+    searchSeq.current += 1;
+  }
+
   const applyMatch = useCallback(
     (match: CustomerMatch) => {
-      skipNextLookup.current = true;
+      cancelPendingSearch();
+      suppressSearchRef.current = true;
       setMatchedCustomer(match);
       setCustomerName(match.customer_name);
       setMobile(match.mobile_number ?? "");
@@ -119,63 +136,124 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
       setSubAreaName(match.sub_area ?? null);
       if (match.favourite_sweet) setFavouriteSweet(match.favourite_sweet);
       setReview(match.review ?? "");
-      // Amount is for *this* visit — leave blank for the counter to enter today's purchase.
       setAmount("");
+      setSuggestions([]);
+      setSuggestOpen(false);
+      setActiveField(null);
     },
     [localAreas],
   );
 
-  const clearMatch = useCallback(() => {
+  /** Clear a wrong selection — must not snap back from a pending/in-flight search. */
+  function clearSelection() {
+    cancelPendingSearch();
+    suppressSearchRef.current = true;
     setMatchedCustomer(null);
-  }, []);
-
-  const runLookup = useCallback(
-    (name: string, phone: string) => {
-      const trimmedName = name.trim();
-      const trimmedPhone = phone.trim();
-      if (trimmedName.length < 2 && trimmedPhone.replace(/\D/g, "").length < 10) {
-        clearMatch();
-        return;
-      }
-      const seq = ++lookupSeq.current;
-      startLookupTransition(async () => {
-        const result = await lookupCustomerAction({
-          customer_name: trimmedName.length >= 2 ? trimmedName : undefined,
-          mobile_number: trimmedPhone || undefined,
-        });
-        if (seq !== lookupSeq.current) return;
-        if (!result.ok) return;
-        if (result.customer) {
-          applyMatch(result.customer);
-        } else {
-          clearMatch();
-        }
-      });
-    },
-    [applyMatch, clearMatch],
-  );
-
-  useEffect(() => {
-    if (skipNextLookup.current) {
-      skipNextLookup.current = false;
-      return;
-    }
-    const handle = window.setTimeout(() => {
-      runLookup(customerName, mobile);
-    }, 450);
-    return () => window.clearTimeout(handle);
-  }, [customerName, mobile, runLookup]);
-
-  function resetForm() {
-    skipNextLookup.current = true;
     setCustomerName("");
     setMobile("");
     setAreaId(null);
     setSubAreaName(null);
-    setAmount("");
     setFavouriteSweet(null);
     setReview("");
-    setMatchedCustomer(null);
+    setAmount("");
+    setSuggestions([]);
+    setSuggestOpen(false);
+    setActiveField(null);
+  }
+
+  const runSearch = useCallback((opts: { name?: string; phone?: string; field: "name" | "mobile" }) => {
+    if (suppressSearchRef.current) return;
+
+    const trimmedName = (opts.name ?? "").trim();
+    const digits = (opts.phone ?? "").replace(/\D/g, "");
+    const shouldSearchName = opts.field === "name" && trimmedName.length >= 2;
+    const shouldSearchMobile = opts.field === "mobile" && digits.length >= 6;
+
+    if (!shouldSearchName && !shouldSearchMobile) {
+      setSuggestions([]);
+      setSuggestOpen(false);
+      return;
+    }
+
+    const seq = ++searchSeq.current;
+    startSearchTransition(async () => {
+      const result = await searchCustomersAction({
+        customer_name: shouldSearchName ? trimmedName : undefined,
+        mobile_number: shouldSearchMobile ? digits : undefined,
+      });
+      // Drop stale responses (Clear / newer keystroke / selection).
+      if (suppressSearchRef.current || seq !== searchSeq.current) return;
+      if (!result.ok) return;
+      const list = result.customers ?? [];
+      setSuggestions(list);
+      setSuggestOpen(list.length > 0);
+      setActiveField(opts.field);
+    });
+  }, []);
+
+  const scheduleSearch = useCallback(
+    (opts: { name?: string; phone?: string; field: "name" | "mobile" }) => {
+      if (suppressSearchRef.current) return;
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+      searchTimer.current = setTimeout(() => runSearch(opts), 280);
+    },
+    [runSearch],
+  );
+
+  useEffect(() => {
+    function onPointerDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (nameWrapRef.current?.contains(target) || mobileWrapRef.current?.contains(target)) {
+        return;
+      }
+      setSuggestOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
+
+  function resetForm() {
+    clearSelection();
+  }
+
+  function handleNameChange(value: string) {
+    suppressSearchRef.current = false;
+    setCustomerName(value);
+    if (matchedCustomer && value !== matchedCustomer.customer_name) {
+      setMatchedCustomer(null);
+    }
+    if (value.trim().length < 2) {
+      cancelPendingSearch();
+      setSuggestions([]);
+      setSuggestOpen(false);
+      return;
+    }
+    scheduleSearch({ name: value, field: "name" });
+  }
+
+  function handleMobileChange(value: string) {
+    suppressSearchRef.current = false;
+    setMobile(value);
+    if (matchedCustomer) {
+      const matchedDigits = (matchedCustomer.mobile_number ?? "").replace(/\D/g, "");
+      const typedDigits = value.replace(/\D/g, "");
+      if (
+        matchedDigits &&
+        typedDigits !== matchedDigits &&
+        !matchedDigits.startsWith(typedDigits) &&
+        typedDigits !== matchedDigits.slice(-typedDigits.length)
+      ) {
+        setMatchedCustomer(null);
+      }
+    }
+    const digits = value.replace(/\D/g, "");
+    if (digits.length < 6) {
+      cancelPendingSearch();
+      setSuggestions([]);
+      setSuggestOpen(false);
+      return;
+    }
+    scheduleSearch({ phone: value, field: "mobile" });
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -197,6 +275,7 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
       purchase_amount: amount.trim() ? Number(amount) : null,
       favourite_sweet: favouriteSweet,
       review: review.trim() ? review.trim() : undefined,
+      existing_customer_id: matchedCustomer?.id ?? null,
     };
     startTransition(async () => {
       const result = await createCustomerAction(payload);
@@ -285,8 +364,8 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
         <CardHeader>
           <CardTitle>{matchedCustomer ? "Returning customer" : "New customer"}</CardTitle>
           <CardDescription>
-            Built for the billing counter. Only Name &amp; Main Area are required. Matching name
-            or mobile auto-fills an existing record and records another visit.
+            Type a name (2+ letters) or mobile (6+ digits) and pick from the list to load an
+            existing customer. Saving records another visit without creating a duplicate.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -296,7 +375,7 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
                 <UserCheck className="mt-0.5 h-5 w-5 shrink-0" />
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="text-sm font-medium">
-                    Match found — details pre-filled from existing record
+                    Selected existing customer — details pre-filled
                   </p>
                   <p className="text-xs">
                     {matchedCustomer.customer_name}
@@ -311,59 +390,129 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
                   </p>
                   <p className="text-[11px] opacity-80">
                     Enter today&apos;s purchase amount below; it will be added to today&apos;s
-                    revenue without creating a duplicate customer.
+                    revenue.
                   </p>
                 </div>
-                {isLookingUp && <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 text-emerald-800 hover:bg-emerald-500/20 dark:text-emerald-200"
+                  onClick={clearSelection}
+                >
+                  <X className="h-4 w-4" />
+                  Clear
+                </Button>
               </div>
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2 sm:col-span-2" ref={nameWrapRef}>
                 <Label htmlFor="name">
                   Customer name <span className="text-destructive">*</span>
                 </Label>
                 <div className="relative">
-                  <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <User className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="name"
                     autoFocus
                     autoComplete="off"
                     required
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    onBlur={() => runLookup(customerName, mobile)}
-                    placeholder="e.g. Rajesh Kumar"
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    onFocus={() => {
+                      if (suggestions.length > 0 && activeField === "name") setSuggestOpen(true);
+                    }}
+                    placeholder="e.g. Sai — pick from suggestions if returning"
                     className="pl-9"
                   />
+                  {isSearching && activeField === "name" && (
+                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                  )}
+                  {suggestOpen && activeField === "name" && suggestions.length > 0 && (
+                    <ul
+                      className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+                      role="listbox"
+                    >
+                      {suggestions.map((s) => (
+                        <li key={s.id}>
+                          <button
+                            type="button"
+                            className="flex w-full flex-col items-start gap-0.5 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => applyMatch(s)}
+                          >
+                            <span className="font-medium">{s.customer_name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {s.mobile_number ?? "No mobile"} · {s.main_area}
+                              {s.sub_area ? `, ${s.sub_area}` : ""} · {s.visit_count} visit
+                              {s.visit_count === 1 ? "" : "s"}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 {errors.customer_name && (
                   <p className="text-xs text-destructive">{errors.customer_name}</p>
                 )}
+                <p className="text-[11px] text-muted-foreground">
+                  Predictive search from 2 characters. Select a row to load their details.
+                </p>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2" ref={mobileWrapRef}>
                 <Label htmlFor="mobile">Mobile number <b>(optional)</b></Label>
                 <div className="relative">
-                  <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Phone className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="mobile"
                     type="tel"
                     inputMode="numeric"
                     autoComplete="off"
                     value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    onBlur={() => runLookup(customerName, mobile)}
-                    placeholder="98xxxxxxxx"
+                    onChange={(e) => handleMobileChange(e.target.value)}
+                    onFocus={() => {
+                      if (suggestions.length > 0 && activeField === "mobile") setSuggestOpen(true);
+                    }}
+                    placeholder="98xxxx — suggestions after 6 digits"
                     className="pl-9"
                     maxLength={14}
                   />
+                  {isSearching && activeField === "mobile" && (
+                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                  )}
+                  {suggestOpen && activeField === "mobile" && suggestions.length > 0 && (
+                    <ul
+                      className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+                      role="listbox"
+                    >
+                      {suggestions.map((s) => (
+                        <li key={s.id}>
+                          <button
+                            type="button"
+                            className="flex w-full flex-col items-start gap-0.5 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => applyMatch(s)}
+                          >
+                            <span className="font-medium">{s.customer_name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {s.mobile_number ?? "No mobile"} · {s.main_area}
+                              {s.sub_area ? `, ${s.sub_area}` : ""} · {s.visit_count} visit
+                              {s.visit_count === 1 ? "" : "s"}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 {errors.mobile_number && (
                   <p className="text-xs text-destructive">{errors.mobile_number}</p>
                 )}
                 <p className="text-[11px] text-muted-foreground">
-                  Optional. Used to find returning customers and avoid duplicate records.
+                  After 6 digits, matching numbers appear — pick one to avoid duplicates.
                 </p>
               </div>
 
@@ -594,8 +743,9 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
           <div className="rounded-md border bg-muted/30 p-3">
             <p className="font-medium">Returning customers</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Type a name or mobile — if they already exist, we fill Name, Number, and Location
-              and bump their visit count instead of creating a duplicate.
+              Suggestions appear as you type a name or 6+ mobile digits. Pick the right person
+              from the list — use <span className="font-medium text-foreground">Clear</span> if
+              the wrong one was selected.
             </p>
           </div>
           <div className="rounded-md border bg-muted/30 p-3">
