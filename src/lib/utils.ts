@@ -29,6 +29,39 @@ export function formatKm(value: number | null | undefined) {
   return `${value.toFixed(2)} km`;
 }
 
+/** Calendar-day gap from an ISO timestamp to local today (0 = today). */
+export function calendarDaysSince(iso: string | null | undefined, now = new Date()): number | null {
+  if (!iso) return null;
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return null;
+
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startThen = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  const diffMs = startToday.getTime() - startThen.getTime();
+  const days = Math.round(diffMs / (24 * 60 * 60 * 1000));
+
+  // Future clocks / TZ skew — treat as today rather than negative.
+  if (days < 0) return 0;
+  return days;
+}
+
+/**
+ * Counter-friendly last-visit label.
+ * - today → "visited today"
+ * - 1 → "visited 1 day back"
+ * - n → "visited n days back"
+ */
+export function formatVisitedDaysBack(
+  iso: string | null | undefined,
+  now = new Date(),
+): string | null {
+  const days = calendarDaysSince(iso, now);
+  if (days == null) return null;
+  if (days === 0) return "visited today";
+  if (days === 1) return "visited 1 day back";
+  return `visited ${days} days back`;
+}
+
 export function initials(name: string) {
   return name
     .split(" ")

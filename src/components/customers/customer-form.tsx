@@ -48,6 +48,7 @@ import {
 } from "@/app/(app)/customers/actions";
 import { FAVOURITE_SWEET_PROMPT, FAVOURITE_SWEETS } from "@/lib/sweets";
 import type { AppRole, HyderabadArea, HyderabadSubArea } from "@/lib/supabase/types";
+import { formatVisitedDaysBack } from "@/lib/utils";
 
 interface Props {
   areas: HyderabadArea[];
@@ -385,7 +386,11 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
   function formatSuggestionMeta(s: CustomerMatch) {
     const mobileLabel = s.mobile_number?.trim() ? s.mobile_number : "Not Available";
     const areaLabel = s.sub_area ? `${s.main_area} · ${s.sub_area}` : s.main_area;
-    return `${mobileLabel} · ${areaLabel} · ${s.visit_count} visit${s.visit_count === 1 ? "" : "s"}`;
+    const visits = `${s.visit_count} visit${s.visit_count === 1 ? "" : "s"}`;
+    const ago = formatVisitedDaysBack(s.last_visited_at);
+    return ago
+      ? `${mobileLabel} · ${areaLabel} · ${visits} · ${ago}`
+      : `${mobileLabel} · ${areaLabel} · ${visits}`;
   }
 
   function SuggestionList({ field }: { field: "name" | "mobile" }) {
@@ -463,8 +468,13 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
                     {matchedCustomer.sub_area ? `, ${matchedCustomer.sub_area}` : ""}
                     {" · "}
                     {matchedCustomer.visit_count} prior visit
-                    {matchedCustomer.visit_count === 1 ? "" : "s"} — saving will record visit #
-                    {matchedCustomer.visit_count + 1}.
+                    {matchedCustomer.visit_count === 1 ? "" : "s"}
+                    {(() => {
+                      const ago = formatVisitedDaysBack(matchedCustomer.last_visited_at);
+                      return ago ? ` · ${ago}` : "";
+                    })()}
+                    {" — "}
+                    saving will record visit #{matchedCustomer.visit_count + 1}.
                   </p>
                   <p className="text-[11px] opacity-80">
                     Enter today&apos;s purchase amount below; it will be added to today&apos;s

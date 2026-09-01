@@ -35,7 +35,11 @@ export type CustomerMatch = Pick<
   | "review"
   | "visit_count"
   | "purchase_amount"
->;
+> & {
+  /** Latest visit timestamp (customer_visits), else customer.created_at. */
+  last_visited_at: string | null;
+  created_at?: string;
+};
 
 function toFieldErrors(issues: { path: (string | number)[]; message: string }[]) {
   const out: Record<string, string> = {};
@@ -76,7 +80,42 @@ function revalidateCustomerPaths() {
 }
 
 const MATCH_SELECT =
-  "id, customer_name, mobile_number, main_area, sub_area, favourite_sweet, review, visit_count, purchase_amount";
+  "id, customer_name, mobile_number, main_area, sub_area, favourite_sweet, review, visit_count, purchase_amount, created_at";
+
+type MatchRow = Omit<CustomerMatch, "last_visited_at"> & { created_at?: string };
+
+/**
+ * Attach latest visit time per customer (from customer_visits), falling back to created_at.
+ */
+async function attachLastVisited(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  rows: MatchRow[],
+): Promise<CustomerMatch[]> {
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((r) => r.id);
+  const latestByCustomer = new Map<string, string>();
+
+  const { data: visits, error: visitErr } = await supabase
+    .from("customer_visits")
+    .select("customer_id, created_at")
+    .in("customer_id", ids)
+    .order("created_at", { ascending: false });
+
+  if (!visitErr) {
+    for (const visit of visits ?? []) {
+      if (!visit.customer_id || !visit.created_at) continue;
+      if (!latestByCustomer.has(visit.customer_id)) {
+        latestByCustomer.set(visit.customer_id, visit.created_at);
+      }
+    }
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    last_visited_at: latestByCustomer.get(row.id) ?? row.created_at ?? null,
+  }));
+}
 
 /**
  * Predictive search for the counter form (suggestions only — never auto-binds a customer).
@@ -99,13 +138,13 @@ export async function searchCustomersAction(input: {
 
   const { supabase } = auth;
   const seen = new Set<string>();
-  const results: CustomerMatch[] = [];
+  const results: MatchRow[] = [];
 
-  function pushRows(rows: CustomerMatch[] | null | undefined) {
+  function pushRows(rows: MatchRow[] | null | undefined) {
     for (const row of rows ?? []) {
       if (seen.has(row.id)) continue;
       seen.add(row.id);
-      results.push(row as CustomerMatch);
+      results.push(row);
     }
   }
 
@@ -117,7 +156,7 @@ export async function searchCustomersAction(input: {
       .ilike("customer_name", `${name}%`)
       .order("customer_name", { ascending: true })
       .limit(8);
-    pushRows(prefixHits as CustomerMatch[] | null);
+    pushRows(prefixHits as MatchRow[] | null);
 
     if (results.length < 8) {
       const { data: containsHits } = await supabase
@@ -126,7 +165,7 @@ export async function searchCustomersAction(input: {
         .ilike("customer_name", `%${name}%`)
         .order("customer_name", { ascending: true })
         .limit(8);
-      pushRows(containsHits as CustomerMatch[] | null);
+      pushRows(containsHits as MatchRow[] | null);
     }
   }
 
@@ -139,14 +178,16 @@ export async function searchCustomersAction(input: {
       .order("created_at", { ascending: false })
       .limit(20);
 
-    const filtered = ((mobileHits ?? []) as CustomerMatch[]).filter((row) => {
+    const filtered = ((mobileHits ?? []) as MatchRow[]).filter((row) => {
       const normalised = normaliseMobile(row.mobile_number);
       return normalised != null && normalised.includes(digits);
     });
     pushRows(filtered);
   }
 
-  return { ok: true, customers: results.slice(0, 8) };
+  const sliced = results.slice(0, 8);
+  const customers = await attachLastVisited(supabase, sliced);
+  return { ok: true, customers };
 }
 
 export async function createCustomerAction(input: unknown): Promise<ActionResult> {
