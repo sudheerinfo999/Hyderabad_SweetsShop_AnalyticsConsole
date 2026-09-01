@@ -86,6 +86,8 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
   const [lastSavedName, setLastSavedName] = useState<string | null>(null);
   const [lastVisitCount, setLastVisitCount] = useState<number | null>(null);
   const [matchedCustomer, setMatchedCustomer] = useState<CustomerMatch | null>(null);
+  /** User chose to create a separate record despite name suggestions. */
+  const [forceNewCustomer, setForceNewCustomer] = useState(false);
   const [suggestions, setSuggestions] = useState<CustomerMatch[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [activeField, setActiveField] = useState<"name" | "mobile" | null>(null);
@@ -126,6 +128,7 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
     (match: CustomerMatch) => {
       cancelPendingSearch();
       suppressSearchRef.current = true;
+      setForceNewCustomer(false);
       setMatchedCustomer(match);
       setCustomerName(match.customer_name);
       setMobile(match.mobile_number ?? "");
@@ -144,10 +147,30 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
     [localAreas],
   );
 
+  /** Same name can be a different person — keep name, start a fresh record. */
+  function addAsNewCustomer() {
+    cancelPendingSearch();
+    suppressSearchRef.current = true;
+    const keptName = customerName.trim();
+    setForceNewCustomer(true);
+    setMatchedCustomer(null);
+    setCustomerName(keptName);
+    setMobile("");
+    setAreaId(null);
+    setSubAreaName(null);
+    setFavouriteSweet(null);
+    setReview("");
+    setAmount("");
+    setSuggestions([]);
+    setSuggestOpen(false);
+    setActiveField(null);
+  }
+
   /** Clear a wrong selection — must not snap back from a pending/in-flight search. */
   function clearSelection() {
     cancelPendingSearch();
     suppressSearchRef.current = true;
+    setForceNewCustomer(false);
     setMatchedCustomer(null);
     setCustomerName("");
     setMobile("");
@@ -275,7 +298,8 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
       purchase_amount: amount.trim() ? Number(amount) : null,
       favourite_sweet: favouriteSweet,
       review: review.trim() ? review.trim() : undefined,
-      existing_customer_id: matchedCustomer?.id ?? null,
+      // Only bind to an existing row when the user explicitly selected one.
+      existing_customer_id: matchedCustomer && !forceNewCustomer ? matchedCustomer.id : null,
     };
     startTransition(async () => {
       const result = await createCustomerAction(payload);
@@ -358,14 +382,68 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
 
   const isAdmin = role === "admin";
 
+  function formatSuggestionMeta(s: CustomerMatch) {
+    const mobileLabel = s.mobile_number?.trim() ? s.mobile_number : "Not Available";
+    const areaLabel = s.sub_area ? `${s.main_area} · ${s.sub_area}` : s.main_area;
+    return `${mobileLabel} · ${areaLabel} · ${s.visit_count} visit${s.visit_count === 1 ? "" : "s"}`;
+  }
+
+  function SuggestionList({ field }: { field: "name" | "mobile" }) {
+    if (!suggestOpen || activeField !== field || suggestions.length === 0) return null;
+    return (
+      <ul
+        className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+        role="listbox"
+      >
+        <li className="px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Matching customers (select if same person)
+        </li>
+        {suggestions.map((s) => (
+          <li key={s.id}>
+            <button
+              type="button"
+              className="flex w-full flex-col items-start gap-0.5 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyMatch(s)}
+            >
+              <span className="font-medium">{s.customer_name}</span>
+              <span className="text-xs text-muted-foreground">{formatSuggestionMeta(s)}</span>
+            </button>
+          </li>
+        ))}
+        <li className="mt-1 border-t pt-1">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-sm px-3 py-2.5 text-left text-sm font-medium text-primary hover:bg-accent"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={addAsNewCustomer}
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            Add as New Customer
+          </button>
+          <p className="px-3 pb-2 text-[11px] text-muted-foreground">
+            Same name can be a different person — creates a separate record.
+          </p>
+        </li>
+      </ul>
+    );
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>{matchedCustomer ? "Returning customer" : "New customer"}</CardTitle>
+          <CardTitle>
+            {matchedCustomer
+              ? "Returning customer"
+              : forceNewCustomer
+                ? "New customer (same name OK)"
+                : "New customer"}
+          </CardTitle>
           <CardDescription>
-            Type a name (2+ letters) or mobile (6+ digits) and pick from the list to load an
-            existing customer. Saving records another visit without creating a duplicate.
+            Name matches are suggestions only. Select an existing person to record a visit, or
+            choose <span className="font-medium text-foreground">Add as New Customer</span> when
+            it is someone else with the same name. Mobile is optional.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -379,7 +457,7 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
                   </p>
                   <p className="text-xs">
                     {matchedCustomer.customer_name}
-                    {matchedCustomer.mobile_number ? ` · ${matchedCustomer.mobile_number}` : ""}
+                    {matchedCustomer.mobile_number ? ` · ${matchedCustomer.mobile_number}` : " · No mobile"}
                     {" · "}
                     {matchedCustomer.main_area}
                     {matchedCustomer.sub_area ? `, ${matchedCustomer.sub_area}` : ""}
@@ -406,6 +484,30 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
               </div>
             )}
 
+            {forceNewCustomer && !matchedCustomer && (
+              <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <Plus className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="text-sm font-medium">Adding as a new customer</p>
+                  <p className="text-xs text-muted-foreground">
+                    Name &quot;{customerName || "…"}&quot; may already exist for someone else. This
+                    save will create a <span className="font-medium text-foreground">separate</span>{" "}
+                    record — existing customers with the same name will not be changed.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => setForceNewCustomer(false)}
+                >
+                  <X className="h-4 w-4" />
+                  Undo
+                </Button>
+              </div>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2" ref={nameWrapRef}>
                 <Label htmlFor="name">
@@ -423,42 +525,20 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
                     onFocus={() => {
                       if (suggestions.length > 0 && activeField === "name") setSuggestOpen(true);
                     }}
-                    placeholder="e.g. Sai — pick from suggestions if returning"
+                    placeholder="e.g. Sai Reddy — suggestions are optional"
                     className="pl-9"
                   />
                   {isSearching && activeField === "name" && (
                     <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
                   )}
-                  {suggestOpen && activeField === "name" && suggestions.length > 0 && (
-                    <ul
-                      className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-                      role="listbox"
-                    >
-                      {suggestions.map((s) => (
-                        <li key={s.id}>
-                          <button
-                            type="button"
-                            className="flex w-full flex-col items-start gap-0.5 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => applyMatch(s)}
-                          >
-                            <span className="font-medium">{s.customer_name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {s.mobile_number ?? "No mobile"} · {s.main_area}
-                              {s.sub_area ? `, ${s.sub_area}` : ""} · {s.visit_count} visit
-                              {s.visit_count === 1 ? "" : "s"}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <SuggestionList field="name" />
                 </div>
                 {errors.customer_name && (
                   <p className="text-xs text-destructive">{errors.customer_name}</p>
                 )}
                 <p className="text-[11px] text-muted-foreground">
-                  Predictive search from 2 characters. Select a row to load their details.
+                  Matching names are suggestions only. Select existing, or use Add as New Customer
+                  if it is a different person.
                 </p>
               </div>
 
@@ -476,43 +556,20 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
                     onFocus={() => {
                       if (suggestions.length > 0 && activeField === "mobile") setSuggestOpen(true);
                     }}
-                    placeholder="98xxxx — suggestions after 6 digits"
+                    placeholder="Optional — suggestions after 6 digits"
                     className="pl-9"
                     maxLength={14}
                   />
                   {isSearching && activeField === "mobile" && (
                     <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
                   )}
-                  {suggestOpen && activeField === "mobile" && suggestions.length > 0 && (
-                    <ul
-                      className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-                      role="listbox"
-                    >
-                      {suggestions.map((s) => (
-                        <li key={s.id}>
-                          <button
-                            type="button"
-                            className="flex w-full flex-col items-start gap-0.5 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => applyMatch(s)}
-                          >
-                            <span className="font-medium">{s.customer_name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {s.mobile_number ?? "No mobile"} · {s.main_area}
-                              {s.sub_area ? `, ${s.sub_area}` : ""} · {s.visit_count} visit
-                              {s.visit_count === 1 ? "" : "s"}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <SuggestionList field="mobile" />
                 </div>
                 {errors.mobile_number && (
                   <p className="text-xs text-destructive">{errors.mobile_number}</p>
                 )}
                 <p className="text-[11px] text-muted-foreground">
-                  After 6 digits, matching numbers appear — pick one to avoid duplicates.
+                  Optional. Never required to create a new customer.
                 </p>
               </div>
 
@@ -741,11 +798,11 @@ export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <div className="rounded-md border bg-muted/30 p-3">
-            <p className="font-medium">Returning customers</p>
+            <p className="font-medium">Same name ≠ same person</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Suggestions appear as you type a name or 6+ mobile digits. Pick the right person
-              from the list — use <span className="font-medium text-foreground">Clear</span> if
-              the wrong one was selected.
+              Suggestions are a reference only. Pick an existing row to record a visit, or{" "}
+              <span className="font-medium text-foreground">Add as New Customer</span> when it is
+              someone else — even with the identical name.
             </p>
           </div>
           <div className="rounded-md border bg-muted/30 p-3">

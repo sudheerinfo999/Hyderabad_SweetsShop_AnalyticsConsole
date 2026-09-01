@@ -79,84 +79,7 @@ const MATCH_SELECT =
   "id, customer_name, mobile_number, main_area, sub_area, favourite_sweet, review, visit_count, purchase_amount";
 
 /**
- * Find an existing customer by mobile (preferred) or exact name (case-insensitive).
- */
-async function findExistingCustomer(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  opts: { customer_name?: string; mobile_number?: string | null },
-): Promise<CustomerMatch | null> {
-  const mobile = normaliseMobile(opts.mobile_number ?? null);
-
-  if (mobile) {
-    const variants = [
-      mobile,
-      `+91${mobile}`,
-      `91${mobile}`,
-      `+91-${mobile}`,
-      `+91 ${mobile}`,
-    ];
-    const { data: byMobile } = await supabase
-      .from("customers")
-      .select(MATCH_SELECT)
-      .or(variants.map((v) => `mobile_number.eq.${v}`).join(","))
-      .order("created_at", { ascending: true })
-      .limit(10);
-
-    const hit =
-      (byMobile ?? []).find((row) => normaliseMobile(row.mobile_number) === mobile) ?? null;
-    if (hit) return hit as CustomerMatch;
-
-    // Fallback: scan recent rows whose stored number normalises to the same 10 digits
-    // (covers odd formatting not covered by the exact variants above).
-    const { data: recent } = await supabase
-      .from("customers")
-      .select(MATCH_SELECT)
-      .not("mobile_number", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(200);
-    const soft = (recent ?? []).find((row) => normaliseMobile(row.mobile_number) === mobile);
-    if (soft) return soft as CustomerMatch;
-  }
-
-  const name = opts.customer_name?.trim();
-  if (name && name.length >= 2) {
-    const { data: byName } = await supabase
-      .from("customers")
-      .select(MATCH_SELECT)
-      .ilike("customer_name", name)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (byName) return byName as CustomerMatch;
-  }
-
-  return null;
-}
-
-/** Counter lookup used to pre-fill the form when name or mobile matches. */
-export async function lookupCustomerAction(input: {
-  customer_name?: string;
-  mobile_number?: string;
-}): Promise<ActionResult> {
-  const auth = await requireSignedInUser();
-  if (!auth.ok) return { ok: false, message: auth.message };
-
-  const name = input.customer_name?.trim() ?? "";
-  const mobile = input.mobile_number?.trim() ?? "";
-  if (name.length < 2 && !mobile) {
-    return { ok: true, customer: undefined };
-  }
-
-  const match = await findExistingCustomer(auth.supabase, {
-    customer_name: name.length >= 2 ? name : undefined,
-    mobile_number: mobile || null,
-  });
-
-  return { ok: true, customer: match ?? undefined };
-}
-
-/**
- * Predictive search for the counter form.
+ * Predictive search for the counter form (suggestions only — never auto-binds a customer).
  * - Name: from 2 characters (prefix / contains match)
  * - Mobile: from 6 digits (partial match on stored numbers)
  */
@@ -260,6 +183,8 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
   const full_address = buildFullAddress(parsed.data.main_area, parsed.data.sub_area);
   const amount = parsed.data.purchase_amount ?? null;
 
+  // Name/mobile matches are suggestions only. Treat as returning customer ONLY when
+  // the counter staff explicitly selected an existing record (existing_customer_id).
   let existing: CustomerMatch | null = null;
   if (parsed.data.existing_customer_id) {
     const { data: byId } = await supabase
@@ -268,12 +193,12 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
       .eq("id", parsed.data.existing_customer_id)
       .maybeSingle();
     existing = (byId as CustomerMatch | null) ?? null;
-  }
-  if (!existing) {
-    existing = await findExistingCustomer(supabase, {
-      customer_name: parsed.data.customer_name,
-      mobile_number: parsed.data.mobile_number ?? null,
-    });
+    if (!existing) {
+      return {
+        ok: false,
+        message: "Selected customer was not found. Clear and try again, or add as new.",
+      };
+    }
   }
 
   if (existing) {
