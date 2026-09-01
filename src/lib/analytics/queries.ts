@@ -63,6 +63,24 @@ export async function fetchCustomers(opts?: {
   return data ?? [];
 }
 
+export async function fetchCustomerVisits(opts?: {
+  from?: string;
+  to?: string;
+  limit?: number;
+}): Promise<Array<{ id: string; customer_id: string; purchase_amount: number | null; created_at: string }>> {
+  const supabase = await createSupabaseServerClient();
+  let q = supabase
+    .from("customer_visits")
+    .select("id, customer_id, purchase_amount, created_at")
+    .order("created_at", { ascending: false });
+  if (opts?.from) q = q.gte("created_at", opts.from);
+  if (opts?.to) q = q.lte("created_at", opts.to);
+  if (opts?.limit) q = q.limit(opts.limit);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
+
 export interface KpiSummary {
   todayCount: number;
   weekCount: number;
@@ -77,16 +95,22 @@ export interface KpiSummary {
 
 export async function fetchKpiSummary(): Promise<KpiSummary> {
   const supabase = await createSupabaseServerClient();
-  const [{ data: all, error }] = await Promise.all([
+  const [{ data: all, error }, { data: visits, error: visitErr }] = await Promise.all([
     supabase.from("customers").select("created_at, main_area, sub_area, distance_km, purchase_amount"),
+    supabase.from("customer_visits").select("created_at, purchase_amount"),
   ]);
   if (error) throw error;
+  if (visitErr) throw visitErr;
 
   const rows = (all ?? []) as Array<{
     created_at: string;
     main_area: string;
     sub_area: string | null;
     distance_km: number | null;
+    purchase_amount: number | null;
+  }>;
+  const visitRows = (visits ?? []) as Array<{
+    created_at: string;
     purchase_amount: number | null;
   }>;
 
@@ -100,6 +124,13 @@ export async function fetchKpiSummary(): Promise<KpiSummary> {
   let todayCount = 0;
   let weekCount = 0;
   let monthCount = 0;
+  for (const v of visitRows) {
+    const createdAt = new Date(v.created_at);
+    if (createdAt >= todayStart) todayCount += 1;
+    if (createdAt >= weekStart) weekCount += 1;
+    if (createdAt >= monthStart) monthCount += 1;
+  }
+
   let distSum = 0;
   let distCount = 0;
   let totalRevenue = 0;
@@ -110,10 +141,7 @@ export async function fetchKpiSummary(): Promise<KpiSummary> {
 
   for (const r of rows) {
     const createdAt = new Date(r.created_at);
-    if (createdAt >= todayStart) todayCount += 1;
-    if (createdAt >= weekStart) weekCount += 1;
     if (createdAt >= monthStart) {
-      monthCount += 1;
       areaCurrent.set(r.main_area, (areaCurrent.get(r.main_area) ?? 0) + 1);
     } else if (createdAt >= prevMonthStart) {
       areaPrevious.set(r.main_area, (areaPrevious.get(r.main_area) ?? 0) + 1);

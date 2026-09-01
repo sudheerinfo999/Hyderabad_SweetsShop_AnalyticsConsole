@@ -108,11 +108,14 @@ function bucketize(
     else if (now - t <= 2 * thirty) stats.customersPrev30d.push(c);
 
     if (c.mobile_number) {
-      if (stats.uniqueMobiles.has(c.mobile_number)) {
+      stats.uniqueMobiles.add(c.mobile_number);
+      if ((c.visit_count ?? 1) > 1) {
         stats.repeatMobiles.add(c.mobile_number);
-      } else {
-        stats.uniqueMobiles.add(c.mobile_number);
       }
+    } else if ((c.visit_count ?? 1) > 1) {
+      // Name-only returning customers still contribute to repeat signal via synthetic key.
+      stats.uniqueMobiles.add(`name:${c.id}`);
+      stats.repeatMobiles.add(`name:${c.id}`);
     }
 
     if (c.sub_area) {

@@ -15,6 +15,7 @@ import {
   fetchKpiSummary,
 } from "@/lib/analytics/queries";
 import { generateRecommendations } from "@/lib/analytics/recommendations";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export const metadata = {
 };
 
 export default async function InsightsPage() {
+  await requireAdmin();
   const [kpis, customers, branches, areas] = await Promise.all([
     fetchKpiSummary(),
     fetchCustomers({ limit: 10000 }),

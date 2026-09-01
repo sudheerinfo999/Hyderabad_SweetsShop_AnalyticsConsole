@@ -32,19 +32,23 @@ import {
 import {
   fetchActiveBranches,
   fetchAllAreas,
+  fetchCustomerVisits,
   fetchCustomers,
   fetchKpiSummary,
 } from "@/lib/analytics/queries";
 import { generateRecommendations } from "@/lib/analytics/recommendations";
 import { generateInsights } from "@/lib/analytics/insights";
+import { requireAdmin } from "@/lib/auth";
 import { formatCurrency, formatKm, formatNumber, formatPercent } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [kpis, customers, branches, areasMaster] = await Promise.all([
+  await requireAdmin();
+  const [kpis, customers, visits, branches, areasMaster] = await Promise.all([
     fetchKpiSummary(),
     fetchCustomers({ limit: 5000 }),
+    fetchCustomerVisits({ limit: 20000 }),
     fetchActiveBranches(),
     fetchAllAreas(),
   ]);
@@ -52,7 +56,7 @@ export default async function DashboardPage() {
   const areaAgg = aggregateByArea(customers);
   const subAreaAgg = aggregateBySubArea(customers);
   const distanceAgg = aggregateByDistanceBucket(customers);
-  const dailyAgg = aggregateDaily(customers, 30);
+  const dailyAgg = aggregateDaily(visits, 30);
   const topAreasChart = areaAgg.slice(0, 8).map(({ area, count }) => ({ area, count }));
   const recommendations = generateRecommendations(customers, branches, areasMaster, { topN: 3 });
   const insights = generateInsights({

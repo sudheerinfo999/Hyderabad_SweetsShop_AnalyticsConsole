@@ -9,6 +9,9 @@ In the Supabase dashboard SQL editor (or `psql`), run the files in order:
 
 ```bash
 psql "$SUPABASE_CONNECTION_STRING" -f supabase/migrations/0001_init.sql
+psql "$SUPABASE_CONNECTION_STRING" -f supabase/migrations/0002_favourite_sweet.sql
+psql "$SUPABASE_CONNECTION_STRING" -f supabase/migrations/0003_customer_review.sql
+psql "$SUPABASE_CONNECTION_STRING" -f supabase/migrations/0004_customer_visits.sql
 psql "$SUPABASE_CONNECTION_STRING" -f supabase/seed.sql
 ```
 
@@ -20,6 +23,10 @@ supabase db push             # safer incremental approach
 ```
 
 The migration is idempotent — running it twice will not duplicate rows.
+
+`0004_customer_visits.sql` adds `visit_count` on `customers`, a `customer_visits`
+ledger (for daily revenue on return visits), and allows staff to update customer
+rows when recording a returning visit.
 
 ## 2. Create your first admin user
 
@@ -56,8 +63,9 @@ All tables are RLS-enabled. Policies:
 - `profiles`: users can read their own row; admins can read & manage all.
 - `hyderabad_areas`, `hyderabad_sub_areas`, `shop_branches`: readable by every
   authenticated user; writable by admins only.
-- `customers`: any signed-in staff member can read & insert; admins can update
-  and delete.
+- `customers`: any signed-in staff member can read, insert, and update (needed
+  for visit increments); admins can also delete.
+- `customer_visits`: staff can read & insert; admins can delete.
 
 The `assign_nearest_branch` trigger automatically fills in `nearest_branch_id`
 and `distance_km` whenever a customer is inserted or moved, using the area /

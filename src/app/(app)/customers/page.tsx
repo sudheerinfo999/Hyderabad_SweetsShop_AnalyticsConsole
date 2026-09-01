@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { CustomerRowActions } from "@/components/customers/row-actions";
 import { fetchActiveBranches, fetchAllAreas } from "@/lib/analytics/queries";
-import { requireProfile } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatCurrency, formatKm } from "@/lib/utils";
 import type { CustomerWithBranch } from "@/lib/supabase/types";
@@ -39,7 +39,7 @@ export default async function CustomersPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const profile = await requireProfile();
+  const profile = await requireAdmin();
   const supabase = await createSupabaseServerClient();
   const [areas, branches] = await Promise.all([fetchAllAreas(), fetchActiveBranches()]);
 
@@ -157,6 +157,7 @@ export default async function CustomersPage({
                   <TableHead>Area</TableHead>
                   <TableHead>Branch</TableHead>
                   <TableHead>Distance</TableHead>
+                  <TableHead>Visits</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Favourite sweet</TableHead>
                   <TableHead>Review</TableHead>
@@ -183,6 +184,9 @@ export default async function CustomersPage({
                       )}
                     </TableCell>
                     <TableCell>{formatKm(c.distance_km != null ? Number(c.distance_km) : null)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{c.visit_count ?? 1}</Badge>
+                    </TableCell>
                     <TableCell>{formatCurrency(c.purchase_amount != null ? Number(c.purchase_amount) : null)}</TableCell>
                     <TableCell>
                       {c.favourite_sweet ? (

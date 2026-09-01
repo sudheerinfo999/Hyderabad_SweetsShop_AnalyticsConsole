@@ -58,9 +58,18 @@ export interface Customer {
   purchase_amount: number | null;
   favourite_sweet: string | null;
   review: string | null;
+  visit_count: number;
   nearest_branch_id: string | null;
   distance_km: number | null;
   is_estimated_location: boolean;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface CustomerVisit {
+  id: string;
+  customer_id: string;
+  purchase_amount: number | null;
   created_at: string;
   created_by: string | null;
 }

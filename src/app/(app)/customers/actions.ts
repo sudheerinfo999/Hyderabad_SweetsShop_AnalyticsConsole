@@ -8,7 +8,7 @@ import {
 } from "@/lib/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { HyderabadArea, HyderabadSubArea } from "@/lib/supabase/types";
+import type { Customer, HyderabadArea, HyderabadSubArea } from "@/lib/supabase/types";
 
 export interface ActionResult {
   ok: boolean;
@@ -17,7 +17,24 @@ export interface ActionResult {
   id?: string;
   area?: HyderabadArea;
   subArea?: HyderabadSubArea;
+  /** True when an existing customer was updated (visit incremented). */
+  returning?: boolean;
+  visitCount?: number;
+  customer?: CustomerMatch;
 }
+
+export type CustomerMatch = Pick<
+  Customer,
+  | "id"
+  | "customer_name"
+  | "mobile_number"
+  | "main_area"
+  | "sub_area"
+  | "favourite_sweet"
+  | "review"
+  | "visit_count"
+  | "purchase_amount"
+>;
 
 function toFieldErrors(issues: { path: (string | number)[]; message: string }[]) {
   const out: Record<string, string> = {};
@@ -36,6 +53,107 @@ async function requireSignedInUser() {
   return { ok: true as const, user, supabase };
 }
 
+/** Normalise Indian mobiles to a 10-digit form for matching. */
+export function normaliseMobile(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const digits = value.replace(/\D/g, "");
+  if (digits.length >= 10) return digits.slice(-10);
+  return digits.length > 0 ? digits : null;
+}
+
+function buildFullAddress(mainArea: string, subArea: string | null | undefined) {
+  return subArea ? `${subArea}, ${mainArea}, Hyderabad` : `${mainArea}, Hyderabad`;
+}
+
+function revalidateCustomerPaths() {
+  revalidatePath("/customers");
+  revalidatePath("/customers/new");
+  revalidatePath("/dashboard");
+  revalidatePath("/analytics");
+  revalidatePath("/reports");
+  revalidatePath("/recommendations");
+}
+
+const MATCH_SELECT =
+  "id, customer_name, mobile_number, main_area, sub_area, favourite_sweet, review, visit_count, purchase_amount";
+
+/**
+ * Find an existing customer by mobile (preferred) or exact name (case-insensitive).
+ */
+async function findExistingCustomer(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  opts: { customer_name?: string; mobile_number?: string | null },
+): Promise<CustomerMatch | null> {
+  const mobile = normaliseMobile(opts.mobile_number ?? null);
+
+  if (mobile) {
+    const variants = [
+      mobile,
+      `+91${mobile}`,
+      `91${mobile}`,
+      `+91-${mobile}`,
+      `+91 ${mobile}`,
+    ];
+    const { data: byMobile } = await supabase
+      .from("customers")
+      .select(MATCH_SELECT)
+      .or(variants.map((v) => `mobile_number.eq.${v}`).join(","))
+      .order("created_at", { ascending: true })
+      .limit(10);
+
+    const hit =
+      (byMobile ?? []).find((row) => normaliseMobile(row.mobile_number) === mobile) ?? null;
+    if (hit) return hit as CustomerMatch;
+
+    // Fallback: scan recent rows whose stored number normalises to the same 10 digits
+    // (covers odd formatting not covered by the exact variants above).
+    const { data: recent } = await supabase
+      .from("customers")
+      .select(MATCH_SELECT)
+      .not("mobile_number", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const soft = (recent ?? []).find((row) => normaliseMobile(row.mobile_number) === mobile);
+    if (soft) return soft as CustomerMatch;
+  }
+
+  const name = opts.customer_name?.trim();
+  if (name && name.length >= 2) {
+    const { data: byName } = await supabase
+      .from("customers")
+      .select(MATCH_SELECT)
+      .ilike("customer_name", name)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (byName) return byName as CustomerMatch;
+  }
+
+  return null;
+}
+
+/** Counter lookup used to pre-fill the form when name or mobile matches. */
+export async function lookupCustomerAction(input: {
+  customer_name?: string;
+  mobile_number?: string;
+}): Promise<ActionResult> {
+  const auth = await requireSignedInUser();
+  if (!auth.ok) return { ok: false, message: auth.message };
+
+  const name = input.customer_name?.trim() ?? "";
+  const mobile = input.mobile_number?.trim() ?? "";
+  if (name.length < 2 && !mobile) {
+    return { ok: true, customer: undefined };
+  }
+
+  const match = await findExistingCustomer(auth.supabase, {
+    customer_name: name.length >= 2 ? name : undefined,
+    mobile_number: mobile || null,
+  });
+
+  return { ok: true, customer: match ?? undefined };
+}
+
 export async function createCustomerAction(input: unknown): Promise<ActionResult> {
   const parsed = customerInputSchema.safeParse(input);
   if (!parsed.success) {
@@ -47,11 +165,9 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
     return { ok: false, message: "Please fix the highlighted fields.", fieldErrors };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "Not authenticated." };
+  const auth = await requireSignedInUser();
+  if (!auth.ok) return { ok: false, message: auth.message };
+  const { user, supabase } = auth;
 
   // Verify the area is in our HMR master list (server-side validation).
   const { data: areaRow, error: areaErr } = await supabase
@@ -69,9 +185,59 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
     };
   }
 
-  const full_address = parsed.data.sub_area
-    ? `${parsed.data.sub_area}, ${parsed.data.main_area}, Hyderabad`
-    : `${parsed.data.main_area}, Hyderabad`;
+  const full_address = buildFullAddress(parsed.data.main_area, parsed.data.sub_area);
+  const amount = parsed.data.purchase_amount ?? null;
+
+  const existing = await findExistingCustomer(supabase, {
+    customer_name: parsed.data.customer_name,
+    mobile_number: parsed.data.mobile_number ?? null,
+  });
+
+  if (existing) {
+    const nextVisitCount = Number(existing.visit_count ?? 1) + 1;
+    const prevAmount = existing.purchase_amount != null ? Number(existing.purchase_amount) : 0;
+    const nextAmount =
+      amount != null ? prevAmount + amount : existing.purchase_amount != null ? prevAmount : null;
+
+    const updatePayload: Record<string, unknown> = {
+      visit_count: nextVisitCount,
+      purchase_amount: nextAmount,
+      main_area: parsed.data.main_area,
+      sub_area: parsed.data.sub_area ?? null,
+      full_address,
+      favourite_sweet: parsed.data.favourite_sweet,
+      is_estimated_location: true,
+    };
+    if (parsed.data.mobile_number) {
+      updatePayload.mobile_number = parsed.data.mobile_number;
+    }
+    if (parsed.data.review) {
+      updatePayload.review = parsed.data.review;
+    }
+
+    const { error: updateErr } = await supabase
+      .from("customers")
+      .update(updatePayload)
+      .eq("id", existing.id);
+
+    if (updateErr) return { ok: false, message: updateErr.message };
+
+    const { error: visitErr } = await supabase.from("customer_visits").insert({
+      customer_id: existing.id,
+      purchase_amount: amount,
+      created_by: user.id,
+    });
+    if (visitErr) return { ok: false, message: visitErr.message };
+
+    revalidateCustomerPaths();
+    return {
+      ok: true,
+      id: existing.id,
+      returning: true,
+      visitCount: nextVisitCount,
+      message: `Returning customer — visit #${nextVisitCount} recorded.`,
+    };
+  }
 
   const { data, error } = await supabase
     .from("customers")
@@ -81,9 +247,10 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
       main_area: parsed.data.main_area,
       sub_area: parsed.data.sub_area ?? null,
       full_address,
-      purchase_amount: parsed.data.purchase_amount ?? null,
+      purchase_amount: amount,
       favourite_sweet: parsed.data.favourite_sweet,
       review: parsed.data.review ?? null,
+      visit_count: 1,
       is_estimated_location: true,
       created_by: user.id,
     })
@@ -92,13 +259,15 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
 
   if (error) return { ok: false, message: error.message };
 
-  revalidatePath("/customers");
-  revalidatePath("/dashboard");
-  revalidatePath("/analytics");
-  revalidatePath("/reports");
-  revalidatePath("/recommendations");
+  const { error: visitErr } = await supabase.from("customer_visits").insert({
+    customer_id: data.id,
+    purchase_amount: amount,
+    created_by: user.id,
+  });
+  if (visitErr) return { ok: false, message: visitErr.message };
 
-  return { ok: true, id: data.id };
+  revalidateCustomerPaths();
+  return { ok: true, id: data.id, returning: false, visitCount: 1 };
 }
 
 export async function deleteCustomerAction(id: string): Promise<ActionResult> {

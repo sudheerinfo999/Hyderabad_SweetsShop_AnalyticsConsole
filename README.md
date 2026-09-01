@@ -176,10 +176,17 @@ by:
 ## 🔐 Roles
 
 - **Admin** — full access: branches, master data, all analytics & exports.
-- **Staff** — fast customer entry, list & search, dashboards & reports.
+- **Staff (normal user)** — **Add Customer only**. Sidebar and routes for
+  dashboard / analytics / reports / map / etc. are blocked; staff land on
+  `/customers/new` after login.
 
 Roles are stored in `public.profiles.role` and enforced through Supabase RLS
-policies plus Next.js server-side guards (`requireAdmin`, `requireProfile`).
+policies, Next.js middleware, and server-side guards (`requireAdmin`,
+`requireProfile`).
+
+Returning customers matched by name or mobile increment `visit_count` and write
+a `customer_visits` row so that day's purchase amount counts toward daily revenue
+without creating a duplicate customer.
 
 ## 📊 Exports
 

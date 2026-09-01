@@ -7,12 +7,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { canAccessPath, homePathForRole } from "@/lib/access";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { AppRole } from "@/lib/supabase/types";
 
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const nextPath = params.get("next") || "/dashboard";
+  const requestedNext = params.get("next");
   const isConfigError = params.get("error") === "config";
 
   const [email, setEmail] = useState("");
@@ -24,11 +26,28 @@ export function LoginForm() {
     setIsLoading(true);
     try {
       const supabase = createSupabaseBrowserClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         toast.error(error.message);
         return;
       }
+
+      let role: AppRole = "staff";
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .maybeSingle();
+        if (profile?.role === "admin" || profile?.role === "staff") {
+          role = profile.role;
+        }
+      }
+
+      const home = homePathForRole(role);
+      const nextPath =
+        requestedNext && canAccessPath(role, requestedNext) ? requestedNext : home;
+
       toast.success("Welcome back!");
       router.replace(nextPath);
       router.refresh();

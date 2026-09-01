@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,7 +12,9 @@ import {
   MessageSquare,
   Phone,
   Plus,
+  RefreshCw,
   User,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -40,22 +42,26 @@ import {
   createCustomAreaAction,
   createCustomSubAreaAction,
   createCustomerAction,
+  lookupCustomerAction,
+  type CustomerMatch,
 } from "@/app/(app)/customers/actions";
 import { FAVOURITE_SWEET_PROMPT, FAVOURITE_SWEETS } from "@/lib/sweets";
-import type { HyderabadArea, HyderabadSubArea } from "@/lib/supabase/types";
+import type { AppRole, HyderabadArea, HyderabadSubArea } from "@/lib/supabase/types";
 
 interface Props {
   areas: HyderabadArea[];
   subAreas: HyderabadSubArea[];
+  role?: AppRole;
 }
 
 const NONE_SUB = "__none__";
 
-export function CustomerForm({ areas, subAreas }: Props) {
+export function CustomerForm({ areas, subAreas, role = "staff" }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isAreaPending, startAreaTransition] = useTransition();
   const [isSubPending, startSubTransition] = useTransition();
+  const [isLookingUp, startLookupTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [localAreas, setLocalAreas] = useState(areas);
@@ -77,6 +83,10 @@ export function CustomerForm({ areas, subAreas }: Props) {
   const [favouriteSweet, setFavouriteSweet] = useState<string | null>(null);
   const [review, setReview] = useState("");
   const [lastSavedName, setLastSavedName] = useState<string | null>(null);
+  const [lastVisitCount, setLastVisitCount] = useState<number | null>(null);
+  const [matchedCustomer, setMatchedCustomer] = useState<CustomerMatch | null>(null);
+  const lookupSeq = useRef(0);
+  const skipNextLookup = useRef(false);
 
   const [areaDialogOpen, setAreaDialogOpen] = useState(false);
   const [customAreaName, setCustomAreaName] = useState("");
@@ -96,13 +106,76 @@ export function CustomerForm({ areas, subAreas }: Props) {
     [localSubAreas, selectedArea],
   );
 
+  const applyMatch = useCallback(
+    (match: CustomerMatch) => {
+      skipNextLookup.current = true;
+      setMatchedCustomer(match);
+      setCustomerName(match.customer_name);
+      setMobile(match.mobile_number ?? "");
+      const area = localAreas.find(
+        (a) => a.area_name.toLowerCase() === match.main_area.toLowerCase(),
+      );
+      setAreaId(area?.id ?? null);
+      setSubAreaName(match.sub_area ?? null);
+      if (match.favourite_sweet) setFavouriteSweet(match.favourite_sweet);
+      setReview(match.review ?? "");
+      // Amount is for *this* visit — leave blank for the counter to enter today's purchase.
+      setAmount("");
+    },
+    [localAreas],
+  );
+
+  const clearMatch = useCallback(() => {
+    setMatchedCustomer(null);
+  }, []);
+
+  const runLookup = useCallback(
+    (name: string, phone: string) => {
+      const trimmedName = name.trim();
+      const trimmedPhone = phone.trim();
+      if (trimmedName.length < 2 && trimmedPhone.replace(/\D/g, "").length < 10) {
+        clearMatch();
+        return;
+      }
+      const seq = ++lookupSeq.current;
+      startLookupTransition(async () => {
+        const result = await lookupCustomerAction({
+          customer_name: trimmedName.length >= 2 ? trimmedName : undefined,
+          mobile_number: trimmedPhone || undefined,
+        });
+        if (seq !== lookupSeq.current) return;
+        if (!result.ok) return;
+        if (result.customer) {
+          applyMatch(result.customer);
+        } else {
+          clearMatch();
+        }
+      });
+    },
+    [applyMatch, clearMatch],
+  );
+
+  useEffect(() => {
+    if (skipNextLookup.current) {
+      skipNextLookup.current = false;
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      runLookup(customerName, mobile);
+    }, 450);
+    return () => window.clearTimeout(handle);
+  }, [customerName, mobile, runLookup]);
+
   function resetForm() {
+    skipNextLookup.current = true;
     setCustomerName("");
     setMobile("");
+    setAreaId(null);
     setSubAreaName(null);
     setAmount("");
     setFavouriteSweet(null);
     setReview("");
+    setMatchedCustomer(null);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -133,7 +206,14 @@ export function CustomerForm({ areas, subAreas }: Props) {
         return;
       }
       setLastSavedName(customerName);
-      toast.success(`${customerName} saved!`);
+      setLastVisitCount(result.visitCount ?? null);
+      if (result.returning) {
+        toast.success(
+          `${customerName} — visit #${result.visitCount} recorded (existing customer).`,
+        );
+      } else {
+        toast.success(`${customerName} saved as a new customer!`);
+      }
       resetForm();
       router.refresh();
     });
@@ -197,17 +277,47 @@ export function CustomerForm({ areas, subAreas }: Props) {
     });
   }
 
+  const isAdmin = role === "admin";
+
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>New customer</CardTitle>
+          <CardTitle>{matchedCustomer ? "Returning customer" : "New customer"}</CardTitle>
           <CardDescription>
-            Built for the billing counter. Only Name &amp; Main Area are required.
+            Built for the billing counter. Only Name &amp; Main Area are required. Matching name
+            or mobile auto-fills an existing record and records another visit.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
+            {matchedCustomer && (
+              <div className="flex items-start gap-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-emerald-800 dark:text-emerald-200">
+                <UserCheck className="mt-0.5 h-5 w-5 shrink-0" />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="text-sm font-medium">
+                    Match found — details pre-filled from existing record
+                  </p>
+                  <p className="text-xs">
+                    {matchedCustomer.customer_name}
+                    {matchedCustomer.mobile_number ? ` · ${matchedCustomer.mobile_number}` : ""}
+                    {" · "}
+                    {matchedCustomer.main_area}
+                    {matchedCustomer.sub_area ? `, ${matchedCustomer.sub_area}` : ""}
+                    {" · "}
+                    {matchedCustomer.visit_count} prior visit
+                    {matchedCustomer.visit_count === 1 ? "" : "s"} — saving will record visit #
+                    {matchedCustomer.visit_count + 1}.
+                  </p>
+                  <p className="text-[11px] opacity-80">
+                    Enter today&apos;s purchase amount below; it will be added to today&apos;s
+                    revenue without creating a duplicate customer.
+                  </p>
+                </div>
+                {isLookingUp && <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
+              </div>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="name">
@@ -222,6 +332,7 @@ export function CustomerForm({ areas, subAreas }: Props) {
                     required
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
+                    onBlur={() => runLookup(customerName, mobile)}
                     placeholder="e.g. Rajesh Kumar"
                     className="pl-9"
                   />
@@ -242,6 +353,7 @@ export function CustomerForm({ areas, subAreas }: Props) {
                     autoComplete="off"
                     value={mobile}
                     onChange={(e) => setMobile(e.target.value)}
+                    onBlur={() => runLookup(customerName, mobile)}
                     placeholder="98xxxxxxxx"
                     className="pl-9"
                     maxLength={14}
@@ -251,12 +363,14 @@ export function CustomerForm({ areas, subAreas }: Props) {
                   <p className="text-xs text-destructive">{errors.mobile_number}</p>
                 )}
                 <p className="text-[11px] text-muted-foreground">
-                  Optional. Used for repeat-customer signals in analytics.
+                  Optional. Used to find returning customers and avoid duplicate records.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="amount">Purchase amount (optional)</Label>
+                <Label htmlFor="amount">
+                  {matchedCustomer ? "Today's purchase amount (optional)" : "Purchase amount (optional)"}
+                </Label>
                 <div className="relative">
                   <IndianRupee className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -445,16 +559,25 @@ export function CustomerForm({ areas, subAreas }: Props) {
                 <span>— nearest branch &amp; travel distance are calculated automatically.</span>
               </div>
               <div className="flex gap-2">
-                <Button asChild type="button" variant="ghost">
-                  <Link href="/customers">Cancel</Link>
-                </Button>
+                {isAdmin ? (
+                  <Button asChild type="button" variant="ghost">
+                    <Link href="/customers">Cancel</Link>
+                  </Button>
+                ) : (
+                  <Button type="button" variant="ghost" onClick={resetForm}>
+                    <RefreshCw className="h-4 w-4" />
+                    Clear
+                  </Button>
+                )}
                 <Button type="submit" variant="maroon" size="lg" disabled={isPending}>
                   {isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : matchedCustomer ? (
+                    <UserCheck className="h-4 w-4" />
                   ) : (
                     <CheckCircle2 className="h-4 w-4" />
                   )}
-                  Save customer
+                  {matchedCustomer ? "Record visit" : "Save customer"}
                 </Button>
               </div>
             </div>
@@ -469,6 +592,13 @@ export function CustomerForm({ areas, subAreas }: Props) {
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <div className="rounded-md border bg-muted/30 p-3">
+            <p className="font-medium">Returning customers</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Type a name or mobile — if they already exist, we fill Name, Number, and Location
+              and bump their visit count instead of creating a duplicate.
+            </p>
+          </div>
+          <div className="rounded-md border bg-muted/30 p-3">
             <p className="font-medium">Keyboard-first</p>
             <p className="mt-1 text-xs text-muted-foreground">
               Tab through the fields, type the area name to filter the dropdown, hit Enter to save.
@@ -482,18 +612,15 @@ export function CustomerForm({ areas, subAreas }: Props) {
               everyone and selected automatically.
             </p>
           </div>
-          <div className="rounded-md border bg-muted/30 p-3">
-            <p className="font-medium">Mobile = bonus</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Capturing mobile lets us identify repeat customers — a big signal for expansion
-              recommendations.
-            </p>
-          </div>
 
           {lastSavedName && (
             <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-emerald-700 dark:text-emerald-300">
               <p className="text-sm font-medium">Saved: {lastSavedName}</p>
-              <p className="mt-1 text-xs">Form reset and ready for the next customer.</p>
+              <p className="mt-1 text-xs">
+                {lastVisitCount && lastVisitCount > 1
+                  ? `Visit #${lastVisitCount} recorded. Form reset for the next customer.`
+                  : "Form reset and ready for the next customer."}
+              </p>
             </div>
           )}
         </CardContent>

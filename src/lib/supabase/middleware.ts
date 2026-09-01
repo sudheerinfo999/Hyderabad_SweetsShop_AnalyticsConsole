@@ -1,5 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { canAccessPath, homePathForRole } from "@/lib/access";
+import type { AppRole } from "@/lib/supabase/types";
 
 const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth"];
 
@@ -12,6 +14,20 @@ function missingEnvResponse(request: NextRequest) {
   url.pathname = "/login";
   url.searchParams.set("error", "config");
   return NextResponse.redirect(url);
+}
+
+async function fetchRole(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+): Promise<AppRole | null> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  const role = data?.role;
+  if (role === "admin" || role === "staff") return role;
+  return null;
 }
 
 export async function updateSession(request: NextRequest) {
@@ -58,10 +74,20 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    if (user && url.pathname === "/login") {
-      url.pathname = "/dashboard";
-      url.search = "";
-      return NextResponse.redirect(url);
+    if (user) {
+      const role = (await fetchRole(supabase, user.id)) ?? "staff";
+
+      if (url.pathname === "/login") {
+        url.pathname = homePathForRole(role);
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+
+      if (!isPublic && !canAccessPath(role, url.pathname)) {
+        url.pathname = homePathForRole(role);
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
     }
 
     return response;

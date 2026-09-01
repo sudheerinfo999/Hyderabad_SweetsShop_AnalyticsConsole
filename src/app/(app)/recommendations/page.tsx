@@ -12,6 +12,7 @@ import {
   RECOMMENDATION_WEIGHTS,
   generateRecommendations,
 } from "@/lib/analytics/recommendations";
+import { requireAdmin } from "@/lib/auth";
 import { formatKm, formatNumber, formatPercent } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ function ScoreBar({ label, score }: { label: string; score: number }) {
 }
 
 export default async function RecommendationsPage() {
+  await requireAdmin();
   const [customers, branches, areas] = await Promise.all([
     fetchCustomers({ limit: 10000 }),
     fetchActiveBranches(),

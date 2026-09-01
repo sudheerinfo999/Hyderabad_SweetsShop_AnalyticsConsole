@@ -178,7 +178,10 @@ export function aggregateByBranch(
     .sort((a, b) => b.count - a.count);
 }
 
-export function aggregateDaily(customers: Customer[], days = 30): DailyPoint[] {
+export function aggregateDaily(
+  visits: { created_at: string; purchase_amount: number | null }[],
+  days = 30,
+): DailyPoint[] {
   const points = new Map<string, { count: number; revenue: number }>();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -189,12 +192,12 @@ export function aggregateDaily(customers: Customer[], days = 30): DailyPoint[] {
     points.set(d.toISOString().slice(0, 10), { count: 0, revenue: 0 });
   }
 
-  for (const c of customers) {
-    const key = new Date(c.created_at).toISOString().slice(0, 10);
+  for (const v of visits) {
+    const key = new Date(v.created_at).toISOString().slice(0, 10);
     const point = points.get(key);
     if (!point) continue;
     point.count += 1;
-    point.revenue += Number(c.purchase_amount ?? 0);
+    point.revenue += Number(v.purchase_amount ?? 0);
   }
 
   return Array.from(points.entries()).map(([date, v]) => ({

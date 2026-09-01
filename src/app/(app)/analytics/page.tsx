@@ -19,6 +19,7 @@ import {
   aggregateBySubArea,
 } from "@/lib/analytics/aggregations";
 import { fetchActiveBranches, fetchCustomers } from "@/lib/analytics/queries";
+import { requireAdmin } from "@/lib/auth";
 import { formatCurrency, formatKm, formatNumber, formatPercent } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export const metadata = {
 };
 
 export default async function AnalyticsPage() {
+  await requireAdmin();
   const [customers, branches] = await Promise.all([
     fetchCustomers({ limit: 10000 }),
     fetchActiveBranches(),
